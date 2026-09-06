@@ -12,6 +12,7 @@ const shareButton = document.querySelector("#share-page");
 const sectionNav = document.querySelector("#section-nav");
 const sectionToggle = document.querySelector("#section-toggle");
 const sectionPopover = document.querySelector("#section-popover");
+const sectionDocumentTitle = document.querySelector("#section-document-title");
 const sectionList = document.querySelector("#section-list");
 const toast = document.querySelector("#toast");
 
@@ -175,6 +176,22 @@ function createOutlineList(items) {
   return list;
 }
 
+async function getPdfMetadataTitle() {
+  try {
+    const { info, metadata } = await pdfDocument.getMetadata();
+    const infoTitle = typeof info?.Title === "string" ? info.Title.trim() : "";
+
+    if (infoTitle) {
+      return infoTitle;
+    }
+
+    const xmpTitle = metadata?.get?.("dc:title");
+    return typeof xmpTitle === "string" ? xmpTitle.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
 async function initializeSectionNavigation() {
   let outline;
 
@@ -191,6 +208,12 @@ async function initializeSectionNavigation() {
   const outlineList = createOutlineList(outline);
   if (!outlineList.childElementCount) {
     return;
+  }
+
+  const metadataTitle = await getPdfMetadataTitle();
+  if (metadataTitle) {
+    sectionDocumentTitle.textContent = metadataTitle;
+    sectionDocumentTitle.hidden = false;
   }
 
   sectionList.replaceChildren(outlineList);
@@ -287,7 +310,7 @@ async function shareCurrentPage() {
 
   if (navigator.share) {
     try {
-      await navigator.share({ title: document.title, url: shareUrl.href });
+      await navigator.share({ url: shareUrl.href });
       return;
     } catch (error) {
       if (error?.name === "AbortError") {
@@ -357,9 +380,6 @@ async function initialize() {
   const requestedPage = getInitialPage(originalUrl);
   const requestUrl = new URL(originalUrl.href);
   requestUrl.hash = "";
-
-  const fileName = decodeURIComponent(requestUrl.pathname.split("/").filter(Boolean).pop() || "PDF");
-  document.title = fileName;
 
   const loadingTask = getDocument({
     url: requestUrl.href,
