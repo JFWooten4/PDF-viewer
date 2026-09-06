@@ -87,6 +87,12 @@ input {
   font-size: 18px;
 }
 
+.icon-button img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
 .mark-button {
   display: grid;
   place-items: center;
