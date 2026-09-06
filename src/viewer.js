@@ -138,15 +138,19 @@ function sectionReferenceFromTitle(title) {
 }
 
 function fullSectionReference(parentReference, localReference) {
-  if (!localReference) {
-    return parentReference;
-  }
-
   if (!parentReference || localReference.includes(".")) {
     return localReference;
   }
 
   return `${parentReference}.${localReference}`;
+}
+
+function fallbackSectionReference(parentReference, position) {
+  return parentReference ? `${parentReference}.${position}` : String(position);
+}
+
+function fallbackSectionCopyText(reference, title) {
+  return `${reference} ("${title}")`;
 }
 
 async function copySectionReference(reference) {
@@ -199,6 +203,7 @@ async function navigateToOutlineItem(item) {
 
 function createOutlineList(items, parentReference = "") {
   const list = document.createElement("ul");
+  let visiblePosition = 0;
 
   for (const item of items) {
     const children = item.items || [];
@@ -210,8 +215,15 @@ function createOutlineList(items, parentReference = "") {
       continue;
     }
 
+    visiblePosition += 1;
     const localReference = sectionReferenceFromTitle(title);
-    const sectionReference = fullSectionReference(parentReference, localReference);
+    const hasExplicitReference = Boolean(localReference);
+    const sectionReference = hasExplicitReference
+      ? fullSectionReference(parentReference, localReference)
+      : fallbackSectionReference(parentReference, visiblePosition);
+    const copyText = hasExplicitReference
+      ? sectionReference
+      : fallbackSectionCopyText(sectionReference, title);
     const entry = document.createElement("li");
     const row = document.createElement("div");
     entry.className = "section-entry";
@@ -231,16 +243,14 @@ function createOutlineList(items, parentReference = "") {
       row.append(heading);
     }
 
-    if (localReference) {
-      const copyButton = document.createElement("button");
-      copyButton.type = "button";
-      copyButton.className = "section-copy";
-      copyButton.textContent = "⧉";
-      copyButton.title = `Copy section reference ${sectionReference}`;
-      copyButton.setAttribute("aria-label", copyButton.title);
-      copyButton.addEventListener("click", () => void copySectionReference(sectionReference));
-      row.append(copyButton);
-    }
+    const copyButton = document.createElement("button");
+    copyButton.type = "button";
+    copyButton.className = "section-copy";
+    copyButton.textContent = "⧉";
+    copyButton.title = `Copy section reference ${copyText}`;
+    copyButton.setAttribute("aria-label", copyButton.title);
+    copyButton.addEventListener("click", () => void copySectionReference(copyText));
+    row.append(copyButton);
 
     entry.append(row);
 
