@@ -17,10 +17,8 @@ async function closeCurrentTab() {
 }
 
 document.addEventListener("keydown", (event) => {
-  const isDeleteKey = event.key === "Backspace" || event.key === "Delete";
-
   if (
-    !isDeleteKey ||
+    event.key !== "Delete" ||
     event.metaKey ||
     event.ctrlKey ||
     event.altKey ||
