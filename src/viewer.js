@@ -522,7 +522,13 @@ async function initialize() {
   bindControls();
   observePages();
   await initializeSectionNavigation();
-  goToPage(currentPage, "auto");
+  if (currentPage === 1) {
+    previousButton.disabled = true;
+    nextButton.disabled = pdfDocument.numPages <= 1;
+    window.scrollTo({ top: 0, behavior: "auto" });
+  } else {
+    goToPage(currentPage, "auto");
+  }
   void renderPage(currentPage);
 }
 
