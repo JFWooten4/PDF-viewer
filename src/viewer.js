@@ -8,6 +8,10 @@ const previousButton = document.querySelector("#previous-page");
 const nextButton = document.querySelector("#next-page");
 const pageNumberInput = document.querySelector("#page-number");
 const pageCount = document.querySelector("#page-count");
+const searchInput = document.querySelector("#search-input");
+const searchCount = document.querySelector("#search-count");
+const searchPreviousButton = document.querySelector("#search-previous");
+const searchNextButton = document.querySelector("#search-next");
 const shareButton = document.querySelector("#share-page");
 const toast = document.querySelector("#toast");
 
@@ -20,8 +24,14 @@ let currentPage = 1;
 let pageElements = [];
 let scrollFrame;
 let toastTimer;
+let searchTimer;
+let searchRequestId = 0;
+let completedSearchQuery = "";
+let searchMatches = [];
+let activeSearchIndex = -1;
 const renderPromises = new Map();
 const renderedPages = new Set();
+const pageTextCache = new Map();
 
 function getInitialPage(url) {
   const match = url.hash.match(/(?:^#|[&#])page=(\d+)/i);
@@ -170,6 +180,156 @@ function observePages() {
   }
 }
 
+function normalizeSearchText(value) {
+  return value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
+}
+
+async function getPageSearchText(pageNumber) {
+  if (pageTextCache.has(pageNumber)) {
+    return pageTextCache.get(pageNumber);
+  }
+
+  const page = await pdfDocument.getPage(pageNumber);
+  const textContent = await page.getTextContent();
+  const text = normalizeSearchText(
+    textContent.items.map((item) => ("str" in item ? item.str : "")).join(" "),
+  );
+
+  pageTextCache.set(pageNumber, text);
+  return text;
+}
+
+function clearSearchPageMarker() {
+  document.querySelector(".page.search-match-page")?.classList.remove("search-match-page");
+}
+
+function resetSearchResults() {
+  searchMatches = [];
+  activeSearchIndex = -1;
+  completedSearchQuery = "";
+  searchCount.textContent = "";
+  searchPreviousButton.disabled = true;
+  searchNextButton.disabled = true;
+  clearSearchPageMarker();
+}
+
+function showSearchMatch(index, behavior = "smooth") {
+  if (!searchMatches.length) {
+    return;
+  }
+
+  activeSearchIndex = (index + searchMatches.length) % searchMatches.length;
+  const match = searchMatches[activeSearchIndex];
+
+  searchCount.textContent = `${activeSearchIndex + 1} / ${searchMatches.length}`;
+  searchPreviousButton.disabled = false;
+  searchNextButton.disabled = false;
+
+  clearSearchPageMarker();
+  const pageElement = pageElements[match.pageNumber - 1];
+  pageElement?.classList.add("search-match-page");
+
+  goToPage(match.pageNumber, behavior);
+  void renderPage(match.pageNumber);
+}
+
+async function runSearch(rawQuery) {
+  const query = normalizeSearchText(rawQuery);
+  const requestId = ++searchRequestId;
+
+  clearTimeout(searchTimer);
+
+  if (!query || !pdfDocument) {
+    resetSearchResults();
+    return;
+  }
+
+  searchCount.textContent = "…";
+  searchPreviousButton.disabled = true;
+  searchNextButton.disabled = true;
+  clearSearchPageMarker();
+
+  const matches = [];
+
+  for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+    const pageText = await getPageSearchText(pageNumber);
+
+    if (requestId !== searchRequestId) {
+      return;
+    }
+
+    let offset = 0;
+    while (offset <= pageText.length - query.length) {
+      const matchOffset = pageText.indexOf(query, offset);
+      if (matchOffset === -1) {
+        break;
+      }
+
+      matches.push({ pageNumber, offset: matchOffset });
+      offset = matchOffset + Math.max(query.length, 1);
+    }
+  }
+
+  if (requestId !== searchRequestId) {
+    return;
+  }
+
+  searchMatches = matches;
+  completedSearchQuery = query;
+
+  if (!matches.length) {
+    activeSearchIndex = -1;
+    searchCount.textContent = "0 / 0";
+    searchPreviousButton.disabled = true;
+    searchNextButton.disabled = true;
+    return;
+  }
+
+  showSearchMatch(0, "auto");
+}
+
+function scheduleSearch() {
+  clearTimeout(searchTimer);
+  searchRequestId += 1;
+
+  const query = searchInput.value.trim();
+  if (!query) {
+    resetSearchResults();
+    return;
+  }
+
+  searchCount.textContent = "…";
+  searchPreviousButton.disabled = true;
+  searchNextButton.disabled = true;
+  clearSearchPageMarker();
+
+  searchTimer = setTimeout(() => {
+    void runSearch(query);
+  }, 180);
+}
+
+function stepSearch(delta) {
+  const query = normalizeSearchText(searchInput.value);
+
+  if (!query) {
+    return;
+  }
+
+  if (query !== completedSearchQuery) {
+    void runSearch(searchInput.value);
+    return;
+  }
+
+  if (searchMatches.length) {
+    showSearchMatch(activeSearchIndex + delta);
+  }
+}
+
+function focusSearch() {
+  searchInput.focus();
+  searchInput.select();
+}
+
 async function shareCurrentPage() {
   const shareUrl = new URL(originalUrl.href);
   shareUrl.hash = `page=${currentPage}`;
@@ -208,8 +368,48 @@ function bindControls() {
     }
   });
 
+  searchInput.addEventListener("input", scheduleSearch);
+  searchPreviousButton.addEventListener("click", () => stepSearch(-1));
+  searchNextButton.addEventListener("click", () => stepSearch(1));
+
+  searchInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      stepSearch(event.shiftKey ? -1 : 1);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      searchInput.blur();
+    }
+  });
+
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      const modifier = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+
+      if (modifier && key === "f") {
+        event.preventDefault();
+        event.stopPropagation();
+        focusSearch();
+        return;
+      }
+
+      if ((modifier && key === "g") || event.key === "F3") {
+        if (!searchInput.value.trim()) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        stepSearch(event.shiftKey ? -1 : 1);
+      }
+    },
+    true,
+  );
+
   document.addEventListener("keydown", (event) => {
-    if (document.activeElement === pageNumberInput) {
+    if (document.activeElement === pageNumberInput || document.activeElement === searchInput) {
       return;
     }
 
@@ -267,4 +467,7 @@ initialize().catch((error) => {
   nextButton.disabled = true;
   shareButton.disabled = true;
   pageNumberInput.disabled = true;
+  searchInput.disabled = true;
+  searchPreviousButton.disabled = true;
+  searchNextButton.disabled = true;
 });
