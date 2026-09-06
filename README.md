@@ -4,8 +4,9 @@ A Chrome Manifest V3 extension that replaces the normal PDF tab with a local dar
 
 ## Features
 
-- Automatically opens URLs ending in `.pdf` in the extension viewer.
-- Also detects main-frame responses with `Content-Type: application/pdf`, so PDF endpoints do not need a `.pdf` suffix.
+- On Chrome 151+, registers as the PDF MIME handler so the original `https://…pdf` URL stays in the address bar while the extension renders the document.
+- Uses Chrome's already-received PDF stream instead of re-requesting the document URL.
+- Falls back to the older extension-page redirect flow on Chrome versions that do not expose the MIME handler API.
 - Renders PDFs locally with bundled PDF.js assets; no remotely hosted code is used.
 - Applies a dark-mode transform to rendered PDF pages.
 - Tracks the page currently centered in the viewport.
@@ -30,8 +31,6 @@ Then:
 
 The root manifest points directly at the source files and local `node_modules`, so a separate build step is not required for normal local development.
 
-For local `file://` PDFs, enable **Allow access to file URLs** for the extension in Chrome's extension details.
-
 ## Build a standalone extension folder
 
 ```sh
@@ -42,10 +41,12 @@ The standalone unpacked extension is written to `dist/`. You can also select `di
 
 ## Usage
 
-Open a PDF normally. The extension redirects the tab to its own viewer while retaining the original document URL internally. Scroll to a page and click **Share page** to share or copy a link such as:
+Open a PDF normally. On Chrome 151+, the extension renders the intercepted PDF stream in place while Chrome keeps the original document URL visible in the address bar. Scroll to a page and click **Share page** to share or copy a link such as:
 
 ```text
 https://example.com/document.pdf#page=42
 ```
+
+On older Chrome versions, the extension retains the previous `chrome-extension://…?url=…` redirect as a compatibility fallback.
 
 The toolbar also supports previous/next page navigation, direct page entry, and left/right arrow keys.
