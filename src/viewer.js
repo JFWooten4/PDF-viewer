@@ -1,4 +1,4 @@
-import { getDocument, GlobalWorkerOptions } from "../node_modules/pdfjs-dist/build/pdf.mjs";
+import { getDocument, GlobalWorkerOptions, TextLayer } from "../node_modules/pdfjs-dist/build/pdf.mjs";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -17,6 +17,10 @@ const previousButton = document.querySelector("#previous-page");
 const nextButton = document.querySelector("#next-page");
 const pageNumberInput = document.querySelector("#page-number");
 const pageCount = document.querySelector("#page-count");
+const searchInput = document.querySelector("#search-input");
+const searchCount = document.querySelector("#search-count");
+const searchPreviousButton = document.querySelector("#search-previous");
+const searchNextButton = document.querySelector("#search-next");
 const shareButton = document.querySelector("#share-page");
 const shareIcon = document.querySelector("#share-icon");
 const sectionNav = document.querySelector("#section-nav");
@@ -57,9 +61,15 @@ let rotation = 0;
 let pageElements = [];
 let scrollFrame;
 let toastTimer;
+let searchTimer;
+let searchRequestId = 0;
+let completedSearchQuery = "";
+let searchMatches = [];
+let activeSearchIndex = -1;
 let renderGeneration = 0;
 const renderPromises = new Map();
 const renderedPages = new Set();
+const pageTextCache = new Map();
 
 function getInitialPage(url) {
   const match = url.hash.match(/(?:^#|[&#])page=(\d+)/i);
@@ -253,6 +263,49 @@ function toggleTheme() {
   setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 }
 
+function highlightTextLayer(textLayer, query) {
+  const normalizedQuery = query.toLocaleLowerCase().trim();
+
+  for (const span of textLayer.querySelectorAll("span")) {
+    const text = span.dataset.searchText ?? span.textContent ?? "";
+    span.dataset.searchText = text;
+    span.replaceChildren(text);
+
+    if (!normalizedQuery) {
+      continue;
+    }
+
+    const comparableText = text.toLocaleLowerCase();
+    const fragment = document.createDocumentFragment();
+    let cursor = 0;
+    let matchIndex = comparableText.indexOf(normalizedQuery);
+
+    while (matchIndex !== -1) {
+      fragment.append(text.slice(cursor, matchIndex));
+      const highlight = document.createElement("mark");
+      highlight.className = "search-highlight";
+      highlight.textContent = text.slice(matchIndex, matchIndex + normalizedQuery.length);
+      fragment.append(highlight);
+      cursor = matchIndex + normalizedQuery.length;
+      matchIndex = comparableText.indexOf(normalizedQuery, cursor);
+    }
+
+    if (cursor > 0) {
+      fragment.append(text.slice(cursor));
+      span.replaceChildren(fragment);
+    }
+  }
+}
+
+function refreshSearchHighlights(query = completedSearchQuery) {
+  for (const pageElement of pageElements) {
+    const textLayer = pageElement.querySelector(".text-layer");
+    if (textLayer) {
+      highlightTextLayer(textLayer, query);
+    }
+  }
+}
+
 async function renderPage(pageNumber) {
   if (renderedPages.has(pageNumber)) {
     return;
@@ -273,17 +326,31 @@ async function renderPage(pageNumber) {
     const outputScale = Math.min(window.devicePixelRatio || 1, 2);
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d", { alpha: false });
+    const textLayer = document.createElement("div");
+    textLayer.className = "text-layer";
 
     canvas.width = Math.floor(viewport.width * outputScale);
     canvas.height = Math.floor(viewport.height * outputScale);
     canvas.style.width = `${viewport.width}px`;
     canvas.style.height = `${viewport.height}px`;
 
-    await page.render({
-      canvasContext: context,
+    const textLayerTask = new TextLayer({
+      textContentSource: page.streamTextContent({
+        includeMarkedContent: true,
+        disableNormalization: true,
+      }),
+      container: textLayer,
       viewport,
-      transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0],
-    }).promise;
+    });
+
+    await Promise.all([
+      page.render({
+        canvasContext: context,
+        viewport,
+        transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0],
+      }).promise,
+      textLayerTask.render(),
+    ]);
 
     if (generation !== renderGeneration) {
       page.cleanup();
@@ -291,7 +358,8 @@ async function renderPage(pageNumber) {
     }
 
     container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
-    container.replaceChildren(canvas);
+    highlightTextLayer(textLayer, completedSearchQuery);
+    container.replaceChildren(canvas, textLayer);
     container.classList.add("rendered");
     renderedPages.add(pageNumber);
     page.cleanup();
@@ -344,6 +412,158 @@ function observePages() {
   for (const page of pageElements) {
     renderObserver.observe(page);
   }
+}
+
+function normalizeSearchText(value) {
+  return value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
+}
+
+async function getPageSearchText(pageNumber) {
+  if (pageTextCache.has(pageNumber)) {
+    return pageTextCache.get(pageNumber);
+  }
+
+  const page = await pdfDocument.getPage(pageNumber);
+  const textContent = await page.getTextContent();
+  const text = normalizeSearchText(
+    textContent.items.map((item) => ("str" in item ? item.str : "")).join(" "),
+  );
+
+  pageTextCache.set(pageNumber, text);
+  return text;
+}
+
+function clearSearchPageMarker() {
+  document.querySelector(".page.search-match-page")?.classList.remove("search-match-page");
+}
+
+function resetSearchResults() {
+  searchMatches = [];
+  activeSearchIndex = -1;
+  completedSearchQuery = "";
+  searchCount.textContent = "";
+  searchPreviousButton.disabled = true;
+  searchNextButton.disabled = true;
+  clearSearchPageMarker();
+  refreshSearchHighlights("");
+}
+
+function showSearchMatch(index, behavior = "smooth") {
+  if (!searchMatches.length) {
+    return;
+  }
+
+  activeSearchIndex = (index + searchMatches.length) % searchMatches.length;
+  const match = searchMatches[activeSearchIndex];
+
+  searchCount.textContent = `${activeSearchIndex + 1} / ${searchMatches.length}`;
+  searchPreviousButton.disabled = false;
+  searchNextButton.disabled = false;
+
+  clearSearchPageMarker();
+  const pageElement = pageElements[match.pageNumber - 1];
+  pageElement?.classList.add("search-match-page");
+
+  goToPage(match.pageNumber, behavior);
+  void renderPage(match.pageNumber).then(() => refreshSearchHighlights());
+}
+
+async function runSearch(rawQuery) {
+  const query = normalizeSearchText(rawQuery);
+  const requestId = ++searchRequestId;
+
+  clearTimeout(searchTimer);
+
+  if (!query || !pdfDocument) {
+    resetSearchResults();
+    return;
+  }
+
+  searchCount.textContent = "…";
+  searchPreviousButton.disabled = true;
+  searchNextButton.disabled = true;
+  clearSearchPageMarker();
+
+  const matches = [];
+
+  for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+    const pageText = await getPageSearchText(pageNumber);
+
+    if (requestId !== searchRequestId) {
+      return;
+    }
+
+    let offset = 0;
+    while (offset <= pageText.length - query.length) {
+      const matchOffset = pageText.indexOf(query, offset);
+      if (matchOffset === -1) {
+        break;
+      }
+
+      matches.push({ pageNumber, offset: matchOffset });
+      offset = matchOffset + Math.max(query.length, 1);
+    }
+  }
+
+  if (requestId !== searchRequestId) {
+    return;
+  }
+
+  searchMatches = matches;
+  completedSearchQuery = query;
+  refreshSearchHighlights(query);
+
+  if (!matches.length) {
+    activeSearchIndex = -1;
+    searchCount.textContent = "0 / 0";
+    searchPreviousButton.disabled = true;
+    searchNextButton.disabled = true;
+    return;
+  }
+
+  showSearchMatch(0, "auto");
+}
+
+function scheduleSearch() {
+  clearTimeout(searchTimer);
+  searchRequestId += 1;
+
+  const query = searchInput.value.trim();
+  if (!query) {
+    resetSearchResults();
+    return;
+  }
+
+  searchCount.textContent = "…";
+  searchPreviousButton.disabled = true;
+  searchNextButton.disabled = true;
+  clearSearchPageMarker();
+
+  searchTimer = setTimeout(() => {
+    void runSearch(query);
+  }, 180);
+}
+
+function stepSearch(delta) {
+  const query = normalizeSearchText(searchInput.value);
+
+  if (!query) {
+    return;
+  }
+
+  if (query !== completedSearchQuery) {
+    void runSearch(searchInput.value);
+    return;
+  }
+
+  if (searchMatches.length) {
+    showSearchMatch(activeSearchIndex + delta);
+  }
+}
+
+function focusSearch() {
+  searchInput.focus();
+  searchInput.select();
 }
 
 async function rotatePages(delta) {
@@ -447,6 +667,46 @@ function bindControls() {
     }
   });
 
+  searchInput.addEventListener("input", scheduleSearch);
+  searchPreviousButton.addEventListener("click", () => stepSearch(-1));
+  searchNextButton.addEventListener("click", () => stepSearch(1));
+
+  searchInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      stepSearch(event.shiftKey ? -1 : 1);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      searchInput.blur();
+    }
+  });
+
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      const modifier = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+
+      if (modifier && key === "f") {
+        event.preventDefault();
+        event.stopPropagation();
+        focusSearch();
+        return;
+      }
+
+      if ((modifier && key === "g") || event.key === "F3") {
+        if (!searchInput.value.trim()) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        stepSearch(event.shiftKey ? -1 : 1);
+      }
+    },
+    true,
+  );
+
   document.addEventListener("pointerdown", (event) => {
     if (!toolsMenu.hidden && !tools.contains(event.target)) {
       setToolsMenuOpen(false);
@@ -466,7 +726,11 @@ function bindControls() {
       return;
     }
 
-    if (document.activeElement === pageNumberInput || sectionPopover.contains(document.activeElement)) {
+    if (
+      document.activeElement === pageNumberInput ||
+      document.activeElement === searchInput ||
+      sectionPopover.contains(document.activeElement)
+    ) {
       return;
     }
 
@@ -535,4 +799,7 @@ initialize().catch((error) => {
   themeButton.disabled = true;
   toolsButton.disabled = true;
   pageNumberInput.disabled = true;
+  searchInput.disabled = true;
+  searchPreviousButton.disabled = true;
+  searchNextButton.disabled = true;
 });
