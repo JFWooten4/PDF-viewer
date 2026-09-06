@@ -32,8 +32,8 @@ const toast = document.querySelector("#toast");
 const params = new URLSearchParams(window.location.search);
 const source = params.get("url");
 const THEME_STORAGE_KEY = "pdf-viewer-theme";
-const LUNA_ICON = "assets/luna-mark.png";
-const CELESTIA_ICON = "assets/celestia-mark.jpg";
+const LUNA_ICON = extensionAssetUrl("src/assets/luna-mark.png", "assets/luna-mark.png");
+const CELESTIA_ICON = extensionAssetUrl("src/assets/celestia-mark.png", "assets/celestia-mark.png");
 
 let pdfDocument;
 let originalUrl;
@@ -122,8 +122,8 @@ function setTheme(theme) {
   localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
 
   const isDark = nextTheme === "dark";
-  themeIcon.classList.toggle("celestia-icon", !isDark);
-  themeIcon.src = chrome.runtime.getURL(isDark ? LUNA_ICON : CELESTIA_ICON);
+  themeIcon.classList.toggle("celestia-icon", isDark);
+  themeIcon.src = isDark ? CELESTIA_ICON : LUNA_ICON;
   themeButton.title = isDark ? "Switch to light mode" : "Switch to dark mode";
   themeButton.setAttribute("aria-label", themeButton.title);
 }

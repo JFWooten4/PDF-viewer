@@ -10,6 +10,6 @@ Theme artwork is the TeePublic design **“MLP - Cutie Mark Rainbow Special - Pr
 
 https://www.teepublic.com/poster-and-art/541555-mlp-cutie-mark-rainbow-special-princess-celestia
 
-The extension packages the image and removes the black background locally at render time with an SVG color filter. The artwork is not regenerated or redrawn.
+The extension packages the mark with a transparent background.
 
 All upstream artwork remains subject to its original rights and licensing terms. This file documents provenance and attribution only.

@@ -7,20 +7,6 @@
     <link rel="stylesheet" href="viewer.css" />
   </head>
   <body>
-    <svg class="image-filters" aria-hidden="true" width="0" height="0">
-      <defs>
-        <filter id="remove-black" color-interpolation-filters="sRGB">
-          <feColorMatrix
-            type="matrix"
-            values="1 0 0 0 0
-                    0 1 0 0 0
-                    0 0 1 0 0
-                    5 5 5 0 -0.12"
-          />
-        </filter>
-      </defs>
-    </svg>
-
     <header class="toolbar" aria-label="PDF controls">
       <button id="previous-page" class="icon-button" type="button" aria-label="Previous page" title="Previous page">←</button>
       <label class="page-control" aria-label="Current page">
@@ -29,10 +15,10 @@
       </label>
       <button id="next-page" class="icon-button" type="button" aria-label="Next page" title="Next page">→</button>
       <div class="spacer"></div>
-      <button id="share-page" class="share-button" type="button">Share page</button>
-      <button id="theme-toggle" class="icon-button theme-button" type="button" aria-label="Switch theme" title="Switch theme">
+      <button id="theme-toggle" class="theme-button" type="button" aria-label="Switch theme" title="Switch theme">
         <img id="theme-icon" alt="" aria-hidden="true" referrerpolicy="no-referrer" />
       </button>
+      <button id="share-page" class="share-button" type="button">Share page</button>
       <div id="tools" class="tools">
         <button id="tools-button" class="icon-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" aria-label="More PDF tools" title="More PDF tools">⋯</button>
         <div id="tools-menu" class="tools-menu" role="menu" hidden>
