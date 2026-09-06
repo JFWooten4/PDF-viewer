@@ -1,5 +1,5 @@
 const PRESERVE_IMAGE_COLORS_STORAGE_KEY = "pdf-viewer-preserve-image-colors";
-const IMAGE_EDGE_SOFTNESS_CSS_PX = 4;
+const IMAGE_CORNER_RADIUS_CSS_PX = 8;
 const preserveImageColorsToggle = document.querySelector("#preserve-image-colors");
 
 function savedPreference() {
@@ -12,73 +12,112 @@ function applyPreference(enabled) {
   document.documentElement.dataset.preserveImageColors = String(enabled);
 }
 
-function softenImageOverlay(overlay) {
-  if (!(overlay instanceof HTMLCanvasElement) || overlay.dataset.edgeSoftened === "true") {
+function visibleCanvasBounds(canvas, context) {
+  const { width, height } = canvas;
+  const { data } = context.getImageData(0, 0, width, height);
+  const alphaAt = (x, y) => data[(y * width + x) * 4 + 3];
+
+  let top = 0;
+  topSearch: for (; top < height; top += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (alphaAt(x, top)) {
+        break topSearch;
+      }
+    }
+  }
+
+  if (top === height) {
+    return null;
+  }
+
+  let bottom = height - 1;
+  bottomSearch: for (; bottom > top; bottom -= 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (alphaAt(x, bottom)) {
+        break bottomSearch;
+      }
+    }
+  }
+
+  let left = 0;
+  leftSearch: for (; left < width; left += 1) {
+    for (let y = top; y <= bottom; y += 1) {
+      if (alphaAt(left, y)) {
+        break leftSearch;
+      }
+    }
+  }
+
+  let right = width - 1;
+  rightSearch: for (; right > left; right -= 1) {
+    for (let y = top; y <= bottom; y += 1) {
+      if (alphaAt(right, y)) {
+        break rightSearch;
+      }
+    }
+  }
+
+  return { top, right, bottom, left };
+}
+
+function roundImageOverlay(overlay) {
+  if (!(overlay instanceof HTMLCanvasElement) || overlay.dataset.cornersRounded === "true") {
     return;
   }
 
-  overlay.dataset.edgeSoftened = "true";
+  overlay.dataset.cornersRounded = "true";
 
   if (!overlay.width || !overlay.height) {
     return;
   }
 
-  const source = document.createElement("canvas");
-  const sourceContext = source.getContext("2d", { alpha: true });
-  const mask = document.createElement("canvas");
-  const maskContext = mask.getContext("2d", { alpha: true });
-  const overlayContext = overlay.getContext("2d", { alpha: true });
-
-  if (!sourceContext || !maskContext || !overlayContext) {
+  const context = overlay.getContext("2d", { alpha: true, willReadFrequently: true });
+  if (!context) {
     return;
   }
 
-  source.width = overlay.width;
-  source.height = overlay.height;
-  mask.width = overlay.width;
-  mask.height = overlay.height;
-  sourceContext.drawImage(overlay, 0, 0);
+  const bounds = visibleCanvasBounds(overlay, context);
+  if (!bounds) {
+    return;
+  }
 
   const cssWidth = Number.parseFloat(overlay.style.width) || overlay.width;
-  const renderScale = overlay.width / cssWidth;
-  const blurRadius = Math.max(1, IMAGE_EDGE_SOFTNESS_CSS_PX * renderScale);
+  const cssHeight = Number.parseFloat(overlay.style.height) || overlay.height;
+  const scaleX = overlay.width / cssWidth;
+  const scaleY = overlay.height / cssHeight;
+  const top = bounds.top / scaleY;
+  const right = (overlay.width - bounds.right - 1) / scaleX;
+  const bottom = (overlay.height - bounds.bottom - 1) / scaleY;
+  const left = bounds.left / scaleX;
+  const visibleWidth = cssWidth - left - right;
+  const visibleHeight = cssHeight - top - bottom;
+  const radius = Math.min(IMAGE_CORNER_RADIUS_CSS_PX, visibleWidth / 2, visibleHeight / 2);
 
-  maskContext.filter = `blur(${blurRadius}px)`;
-  maskContext.drawImage(source, 0, 0);
-  maskContext.filter = "none";
-  maskContext.globalCompositeOperation = "source-in";
-  maskContext.fillStyle = "#fff";
-  maskContext.fillRect(0, 0, mask.width, mask.height);
-
-  overlayContext.clearRect(0, 0, overlay.width, overlay.height);
-  overlayContext.drawImage(source, 0, 0);
-  overlayContext.globalCompositeOperation = "destination-in";
-  overlayContext.drawImage(mask, 0, 0);
-  overlayContext.globalCompositeOperation = "source-over";
+  overlay.style.clipPath = `inset(${top}px ${right}px ${bottom}px ${left}px round ${radius}px)`;
 }
 
-function softenImageOverlaysIn(node) {
+function roundImageOverlaysIn(node) {
   if (!(node instanceof Element)) {
     return;
   }
 
   if (node.matches(".page-image-overlay")) {
-    softenImageOverlay(node);
+    roundImageOverlay(node);
   }
 
   for (const overlay of node.querySelectorAll(".page-image-overlay")) {
-    softenImageOverlay(overlay);
+    roundImageOverlay(overlay);
   }
 }
 
 applyPreference(savedPreference());
 
-document.querySelectorAll(".page-image-overlay").forEach(softenImageOverlay);
+document.querySelectorAll(".page-image-overlay").forEach(roundImageOverlay);
 
 const imageOverlayObserver = new MutationObserver((records) => {
   for (const record of records) {
     for (const node of record.addedNodes) {
-      softenImageOverlaysIn(node);
+      roundImageOverlaysIn(node);
     }
   }
 });
