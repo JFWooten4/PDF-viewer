@@ -18,17 +18,33 @@ const nextButton = document.querySelector("#next-page");
 const pageNumberInput = document.querySelector("#page-number");
 const pageCount = document.querySelector("#page-count");
 const shareButton = document.querySelector("#share-page");
+const themeButton = document.querySelector("#theme-toggle");
+const themeIcon = document.querySelector("#theme-icon");
+const tools = document.querySelector("#tools");
+const toolsButton = document.querySelector("#tools-button");
+const toolsMenu = document.querySelector("#tools-menu");
+const rotateLeftButton = document.querySelector("#rotate-left");
+const rotateRightButton = document.querySelector("#rotate-right");
+const printButton = document.querySelector("#print-pdf");
+const downloadButton = document.querySelector("#download-pdf");
 const toast = document.querySelector("#toast");
 
 const params = new URLSearchParams(window.location.search);
 const source = params.get("url");
+const THEME_STORAGE_KEY = "pdf-viewer-theme";
+const LUNA_ICON = "assets/luna-mark.png";
+const CELESTIA_ICON = "assets/celestia-mark.jpg";
 
 let pdfDocument;
 let originalUrl;
+let requestUrl;
+let fileName = "document.pdf";
 let currentPage = 1;
+let rotation = 0;
 let pageElements = [];
 let scrollFrame;
 let toastTimer;
+let renderGeneration = 0;
 const renderPromises = new Map();
 const renderedPages = new Set();
 
@@ -95,6 +111,27 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("visible"), 1800);
 }
 
+function setToolsMenuOpen(open) {
+  toolsMenu.hidden = !open;
+  toolsButton.setAttribute("aria-expanded", String(open));
+}
+
+function setTheme(theme) {
+  const nextTheme = theme === "light" ? "light" : "dark";
+  document.documentElement.dataset.theme = nextTheme;
+  localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+
+  const isDark = nextTheme === "dark";
+  themeIcon.classList.toggle("celestia-icon", !isDark);
+  themeIcon.src = chrome.runtime.getURL(isDark ? LUNA_ICON : CELESTIA_ICON);
+  themeButton.title = isDark ? "Switch to light mode" : "Switch to dark mode";
+  themeButton.setAttribute("aria-label", themeButton.title);
+}
+
+function toggleTheme() {
+  setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+}
+
 async function renderPage(pageNumber) {
   if (renderedPages.has(pageNumber)) {
     return;
@@ -104,12 +141,14 @@ async function renderPage(pageNumber) {
     return renderPromises.get(pageNumber);
   }
 
-  const promise = (async () => {
+  const generation = renderGeneration;
+  let promise;
+  promise = (async () => {
     const page = await pdfDocument.getPage(pageNumber);
     const container = pageElements[pageNumber - 1];
-    const baseViewport = page.getViewport({ scale: 1 });
+    const baseViewport = page.getViewport({ scale: 1, rotation });
     const cssWidth = Math.max(280, container.clientWidth);
-    const viewport = page.getViewport({ scale: cssWidth / baseViewport.width });
+    const viewport = page.getViewport({ scale: cssWidth / baseViewport.width, rotation });
     const outputScale = Math.min(window.devicePixelRatio || 1, 2);
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d", { alpha: false });
@@ -118,7 +157,6 @@ async function renderPage(pageNumber) {
     canvas.height = Math.floor(viewport.height * outputScale);
     canvas.style.width = `${viewport.width}px`;
     canvas.style.height = `${viewport.height}px`;
-    container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
 
     await page.render({
       canvasContext: context,
@@ -126,6 +164,12 @@ async function renderPage(pageNumber) {
       transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0],
     }).promise;
 
+    if (generation !== renderGeneration) {
+      page.cleanup();
+      return;
+    }
+
+    container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
     container.replaceChildren(canvas);
     container.classList.add("rendered");
     renderedPages.add(pageNumber);
@@ -137,7 +181,9 @@ async function renderPage(pageNumber) {
   try {
     await promise;
   } finally {
-    renderPromises.delete(pageNumber);
+    if (renderPromises.get(pageNumber) === promise) {
+      renderPromises.delete(pageNumber);
+    }
   }
 }
 
@@ -179,6 +225,33 @@ function observePages() {
   }
 }
 
+async function rotatePages(delta) {
+  if (!pdfDocument) {
+    return;
+  }
+
+  rotation = (rotation + delta + 360) % 360;
+  renderGeneration += 1;
+
+  const pagesToRender = new Set([
+    ...renderedPages,
+    ...renderPromises.keys(),
+    currentPage,
+  ]);
+
+  renderedPages.clear();
+  renderPromises.clear();
+
+  for (const pageNumber of pagesToRender) {
+    const container = pageElements[pageNumber - 1];
+    container?.replaceChildren();
+    container?.classList.remove("rendered");
+  }
+
+  await Promise.all([...pagesToRender].map((pageNumber) => renderPage(pageNumber)));
+  pageElements[currentPage - 1]?.scrollIntoView({ behavior: "auto", block: "center" });
+}
+
 async function shareCurrentPage() {
   const shareUrl = new URL(originalUrl.href);
   shareUrl.hash = `page=${currentPage}`;
@@ -202,10 +275,51 @@ async function shareCurrentPage() {
   }
 }
 
+async function printPdf() {
+  if (!pdfDocument) {
+    return;
+  }
+
+  setToolsMenuOpen(false);
+  showToast("Preparing pages for print…");
+  await Promise.all(
+    Array.from({ length: pdfDocument.numPages }, (_, index) => renderPage(index + 1)),
+  );
+  window.print();
+}
+
+async function downloadPdf() {
+  if (!pdfDocument) {
+    return;
+  }
+
+  setToolsMenuOpen(false);
+  showToast("Preparing download…");
+  const data = await pdfDocument.getData();
+  const blob = new Blob([data], { type: "application/pdf" });
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+}
+
 function bindControls() {
   previousButton.addEventListener("click", () => goToPage(currentPage - 1));
   nextButton.addEventListener("click", () => goToPage(currentPage + 1));
   shareButton.addEventListener("click", () => void shareCurrentPage());
+  themeButton.addEventListener("click", toggleTheme);
+  toolsButton.addEventListener("click", () => {
+    setToolsMenuOpen(toolsMenu.hidden);
+  });
+
+  rotateLeftButton.addEventListener("click", () => void rotatePages(-90));
+  rotateRightButton.addEventListener("click", () => void rotatePages(90));
+  printButton.addEventListener("click", () => void printPdf());
+  downloadButton.addEventListener("click", () => void downloadPdf());
 
   pageNumberInput.addEventListener("change", () => {
     goToPage(Number.parseInt(pageNumberInput.value, 10) || currentPage);
@@ -217,7 +331,19 @@ function bindControls() {
     }
   });
 
+  document.addEventListener("pointerdown", (event) => {
+    if (!toolsMenu.hidden && !tools.contains(event.target)) {
+      setToolsMenuOpen(false);
+    }
+  });
+
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !toolsMenu.hidden) {
+      setToolsMenuOpen(false);
+      toolsButton.focus();
+      return;
+    }
+
     if (document.activeElement === pageNumberInput) {
       return;
     }
@@ -234,16 +360,21 @@ function bindControls() {
 }
 
 async function initialize() {
+  setTheme(localStorage.getItem(THEME_STORAGE_KEY) || "dark");
+
   if (!source) {
     throw new Error("No PDF URL was provided.");
   }
 
   originalUrl = new URL(source);
   const requestedPage = getInitialPage(originalUrl);
-  const requestUrl = new URL(originalUrl.href);
+  requestUrl = new URL(originalUrl.href);
   requestUrl.hash = "";
 
-  const fileName = decodeURIComponent(requestUrl.pathname.split("/").filter(Boolean).pop() || "PDF");
+  fileName = decodeURIComponent(requestUrl.pathname.split("/").filter(Boolean).pop() || "document.pdf");
+  if (!fileName.toLowerCase().endsWith(".pdf")) {
+    fileName += ".pdf";
+  }
   document.title = fileName;
 
   const loadingTask = getDocument({
@@ -278,5 +409,7 @@ initialize().catch((error) => {
   previousButton.disabled = true;
   nextButton.disabled = true;
   shareButton.disabled = true;
+  themeButton.disabled = true;
+  toolsButton.disabled = true;
   pageNumberInput.disabled = true;
 });

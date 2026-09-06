@@ -1,16 +1,18 @@
 # PDF Viewer
 
-A Chrome Manifest V3 extension that replaces the normal PDF tab with a local dark-mode PDF.js viewer and makes the current page shareable.
+A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF.js viewer and makes the current page shareable.
 
 ## Features
 
 - Automatically opens URLs ending in `.pdf` in the extension viewer.
 - Also detects main-frame responses with `Content-Type: application/pdf`, so PDF endpoints do not need a `.pdf` suffix.
-- Renders PDFs locally with bundled PDF.js assets; no remotely hosted code is used.
-- Applies a dark-mode transform to rendered PDF pages.
+- Renders PDFs locally with bundled PDF.js assets; no remotely hosted executable code is used.
+- Supports dark and light viewing modes, remembers the selected theme, and uses packaged Luna/Nightmare Moon and Celestia cutie-mark artwork for the theme control. See `CREDITS.md` for attribution.
 - Tracks the page currently centered in the viewport.
 - **Share page** shares the original document URL as `#page=<current page>`; when the Web Share API is unavailable, the link is copied to the clipboard.
 - Honors an existing `#page=N` fragment when opening a document.
+- Keeps less-used PDF actions in a **More tools** menu with rotate left/right, print, and download.
+- Keeps the More tools menu open across repeated rotate actions.
 - Lazy-renders nearby pages so long filings do not render every page up front.
 
 ## Load directly in Chrome
@@ -48,4 +50,4 @@ Open a PDF normally. The extension redirects the tab to its own viewer while ret
 https://example.com/document.pdf#page=42
 ```
 
-The toolbar also supports previous/next page navigation, direct page entry, and left/right arrow keys.
+The toolbar also supports previous/next page navigation, direct page entry, a remembered light/dark toggle, and a compact More tools menu for rotate, print, and download.
