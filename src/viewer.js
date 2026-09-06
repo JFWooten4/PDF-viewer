@@ -1,4 +1,4 @@
-import { getDocument, GlobalWorkerOptions } from "../node_modules/pdfjs-dist/build/pdf.mjs";
+import { getDocument, GlobalWorkerOptions, TextLayer } from "../node_modules/pdfjs-dist/build/pdf.mjs";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -22,14 +22,42 @@ const searchCount = document.querySelector("#search-count");
 const searchPreviousButton = document.querySelector("#search-previous");
 const searchNextButton = document.querySelector("#search-next");
 const shareButton = document.querySelector("#share-page");
+const shareIcon = document.querySelector("#share-icon");
+const sectionNav = document.querySelector("#section-nav");
+const sectionToggle = document.querySelector("#section-toggle");
+const sectionPopover = document.querySelector("#section-popover");
+const sectionList = document.querySelector("#section-list");
+const themeButton = document.querySelector("#theme-toggle");
+const themeIcon = document.querySelector("#theme-icon");
+const tools = document.querySelector("#tools");
+const toolsButton = document.querySelector("#tools-button");
+const toolsMenu = document.querySelector("#tools-menu");
+const rotateLeftButton = document.querySelector("#rotate-left");
+const rotateRightButton = document.querySelector("#rotate-right");
+const printButton = document.querySelector("#print-pdf");
+const downloadButton = document.querySelector("#download-pdf");
 const toast = document.querySelector("#toast");
 
 const params = new URLSearchParams(window.location.search);
 const source = params.get("url");
+const THEME_STORAGE_KEY = "pdf-viewer-theme";
+const LUNA_ICON = extensionAssetUrl("src/assets/luna-mark.png", "assets/luna-mark.png");
+const CELESTIA_ICON = extensionAssetUrl("src/assets/celestia-mark.png", "assets/celestia-mark.png");
+const DARK_MODE_SHARE_ICON = extensionAssetUrl(
+  "src/assets/copy-page-icon.png",
+  "assets/copy-page-icon.png",
+);
+const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
+  "src/assets/copy-page-icon-light.png",
+  "assets/copy-page-icon-light.png",
+);
 
 let pdfDocument;
 let originalUrl;
+let requestUrl;
+let fileName = "document.pdf";
 let currentPage = 1;
+let rotation = 0;
 let pageElements = [];
 let scrollFrame;
 let toastTimer;
@@ -38,6 +66,7 @@ let searchRequestId = 0;
 let completedSearchQuery = "";
 let searchMatches = [];
 let activeSearchIndex = -1;
+let renderGeneration = 0;
 const renderPromises = new Map();
 const renderedPages = new Set();
 const pageTextCache = new Map();
@@ -105,6 +134,178 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("visible"), 1800);
 }
 
+function outlineHasDestination(items) {
+  return items.some(
+    (item) => Boolean(item.dest) || (item.items?.length && outlineHasDestination(item.items)),
+  );
+}
+
+function closeSectionPopover() {
+  sectionPopover.hidden = true;
+  sectionToggle.setAttribute("aria-expanded", "false");
+}
+
+function toggleSectionPopover() {
+  const opening = sectionPopover.hidden;
+  sectionPopover.hidden = !opening;
+  sectionToggle.setAttribute("aria-expanded", String(opening));
+}
+
+async function navigateToOutlineItem(item) {
+  try {
+    let destination = item.dest;
+
+    if (typeof destination === "string") {
+      destination = await pdfDocument.getDestination(destination);
+    }
+
+    if (!Array.isArray(destination) || destination.length === 0) {
+      return;
+    }
+
+    const pageReference = destination[0];
+    let pageIndex;
+
+    if (Number.isInteger(pageReference)) {
+      pageIndex = pageReference;
+    } else {
+      pageIndex = await pdfDocument.getPageIndex(pageReference);
+    }
+
+    goToPage(pageIndex + 1);
+    closeSectionPopover();
+  } catch {
+    showToast("Could not open that section");
+  }
+}
+
+function createOutlineList(items) {
+  const list = document.createElement("ul");
+
+  for (const item of items) {
+    const children = item.items || [];
+    const hasDestination = Boolean(item.dest);
+    const hasChildDestination = children.length > 0 && outlineHasDestination(children);
+    const title = item.title?.trim();
+
+    if (!title || (!hasDestination && !hasChildDestination)) {
+      continue;
+    }
+
+    const entry = document.createElement("li");
+    entry.className = "section-entry";
+
+    if (hasDestination) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "section-link";
+      button.textContent = title;
+      button.addEventListener("click", () => void navigateToOutlineItem(item));
+      entry.append(button);
+    } else {
+      const heading = document.createElement("span");
+      heading.className = "section-heading";
+      heading.textContent = title;
+      entry.append(heading);
+    }
+
+    if (hasChildDestination) {
+      entry.append(createOutlineList(children));
+    }
+
+    list.append(entry);
+  }
+
+  return list;
+}
+
+async function initializeSectionNavigation() {
+  let outline;
+
+  try {
+    outline = await pdfDocument.getOutline();
+  } catch {
+    return;
+  }
+
+  if (!outline?.length || !outlineHasDestination(outline)) {
+    return;
+  }
+
+  const outlineList = createOutlineList(outline);
+  if (!outlineList.childElementCount) {
+    return;
+  }
+
+  sectionList.replaceChildren(outlineList);
+  sectionNav.hidden = false;
+}
+
+function setToolsMenuOpen(open) {
+  toolsMenu.hidden = !open;
+  toolsButton.setAttribute("aria-expanded", String(open));
+}
+
+function setTheme(theme) {
+  const nextTheme = theme === "light" ? "light" : "dark";
+  document.documentElement.dataset.theme = nextTheme;
+  localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+
+  const isDark = nextTheme === "dark";
+  themeIcon.classList.toggle("celestia-icon", isDark);
+  themeIcon.src = isDark ? CELESTIA_ICON : LUNA_ICON;
+  shareIcon.src = isDark ? DARK_MODE_SHARE_ICON : LIGHT_MODE_SHARE_ICON;
+  themeButton.title = isDark ? "Switch to light mode" : "Switch to dark mode";
+  themeButton.setAttribute("aria-label", themeButton.title);
+}
+
+function toggleTheme() {
+  setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+}
+
+function highlightTextLayer(textLayer, query) {
+  const normalizedQuery = query.toLocaleLowerCase().trim();
+
+  for (const span of textLayer.querySelectorAll("span")) {
+    const text = span.dataset.searchText ?? span.textContent ?? "";
+    span.dataset.searchText = text;
+    span.replaceChildren(text);
+
+    if (!normalizedQuery) {
+      continue;
+    }
+
+    const comparableText = text.toLocaleLowerCase();
+    const fragment = document.createDocumentFragment();
+    let cursor = 0;
+    let matchIndex = comparableText.indexOf(normalizedQuery);
+
+    while (matchIndex !== -1) {
+      fragment.append(text.slice(cursor, matchIndex));
+      const highlight = document.createElement("mark");
+      highlight.className = "search-highlight";
+      highlight.textContent = text.slice(matchIndex, matchIndex + normalizedQuery.length);
+      fragment.append(highlight);
+      cursor = matchIndex + normalizedQuery.length;
+      matchIndex = comparableText.indexOf(normalizedQuery, cursor);
+    }
+
+    if (cursor > 0) {
+      fragment.append(text.slice(cursor));
+      span.replaceChildren(fragment);
+    }
+  }
+}
+
+function refreshSearchHighlights(query = completedSearchQuery) {
+  for (const pageElement of pageElements) {
+    const textLayer = pageElement.querySelector(".text-layer");
+    if (textLayer) {
+      highlightTextLayer(textLayer, query);
+    }
+  }
+}
+
 async function renderPage(pageNumber) {
   if (renderedPages.has(pageNumber)) {
     return;
@@ -114,29 +315,51 @@ async function renderPage(pageNumber) {
     return renderPromises.get(pageNumber);
   }
 
-  const promise = (async () => {
+  const generation = renderGeneration;
+  let promise;
+  promise = (async () => {
     const page = await pdfDocument.getPage(pageNumber);
     const container = pageElements[pageNumber - 1];
-    const baseViewport = page.getViewport({ scale: 1 });
+    const baseViewport = page.getViewport({ scale: 1, rotation });
     const cssWidth = Math.max(280, container.clientWidth);
-    const viewport = page.getViewport({ scale: cssWidth / baseViewport.width });
+    const viewport = page.getViewport({ scale: cssWidth / baseViewport.width, rotation });
     const outputScale = Math.min(window.devicePixelRatio || 1, 2);
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d", { alpha: false });
+    const textLayer = document.createElement("div");
+    textLayer.className = "text-layer";
 
     canvas.width = Math.floor(viewport.width * outputScale);
     canvas.height = Math.floor(viewport.height * outputScale);
     canvas.style.width = `${viewport.width}px`;
     canvas.style.height = `${viewport.height}px`;
-    container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
 
-    await page.render({
-      canvasContext: context,
+    const textLayerTask = new TextLayer({
+      textContentSource: page.streamTextContent({
+        includeMarkedContent: true,
+        disableNormalization: true,
+      }),
+      container: textLayer,
       viewport,
-      transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0],
-    }).promise;
+    });
 
-    container.replaceChildren(canvas);
+    await Promise.all([
+      page.render({
+        canvasContext: context,
+        viewport,
+        transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0],
+      }).promise,
+      textLayerTask.render(),
+    ]);
+
+    if (generation !== renderGeneration) {
+      page.cleanup();
+      return;
+    }
+
+    container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
+    highlightTextLayer(textLayer, completedSearchQuery);
+    container.replaceChildren(canvas, textLayer);
     container.classList.add("rendered");
     renderedPages.add(pageNumber);
     page.cleanup();
@@ -147,7 +370,9 @@ async function renderPage(pageNumber) {
   try {
     await promise;
   } finally {
-    renderPromises.delete(pageNumber);
+    if (renderPromises.get(pageNumber) === promise) {
+      renderPromises.delete(pageNumber);
+    }
   }
 }
 
@@ -220,6 +445,7 @@ function resetSearchResults() {
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;
   clearSearchPageMarker();
+  refreshSearchHighlights("");
 }
 
 function showSearchMatch(index, behavior = "smooth") {
@@ -239,7 +465,7 @@ function showSearchMatch(index, behavior = "smooth") {
   pageElement?.classList.add("search-match-page");
 
   goToPage(match.pageNumber, behavior);
-  void renderPage(match.pageNumber);
+  void renderPage(match.pageNumber).then(() => refreshSearchHighlights());
 }
 
 async function runSearch(rawQuery) {
@@ -285,6 +511,7 @@ async function runSearch(rawQuery) {
 
   searchMatches = matches;
   completedSearchQuery = query;
+  refreshSearchHighlights(query);
 
   if (!matches.length) {
     activeSearchIndex = -1;
@@ -339,33 +566,96 @@ function focusSearch() {
   searchInput.select();
 }
 
+async function rotatePages(delta) {
+  if (!pdfDocument) {
+    return;
+  }
+
+  rotation = (rotation + delta + 360) % 360;
+  renderGeneration += 1;
+
+  const pagesToRender = new Set([
+    ...renderedPages,
+    ...renderPromises.keys(),
+    currentPage,
+  ]);
+
+  renderedPages.clear();
+  renderPromises.clear();
+
+  for (const pageNumber of pagesToRender) {
+    const container = pageElements[pageNumber - 1];
+    container?.replaceChildren();
+    container?.classList.remove("rendered");
+  }
+
+  await Promise.all([...pagesToRender].map((pageNumber) => renderPage(pageNumber)));
+  pageElements[currentPage - 1]?.scrollIntoView({ behavior: "auto", block: "center" });
+}
+
 async function shareCurrentPage() {
   const shareUrl = new URL(originalUrl.href);
   shareUrl.hash = `page=${currentPage}`;
 
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: document.title, url: shareUrl.href });
-      return;
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        return;
-      }
-    }
-  }
-
   try {
     await navigator.clipboard.writeText(shareUrl.href);
-    showToast(`Copied page ${currentPage} link`);
   } catch {
-    window.prompt("Copy this page link:", shareUrl.href);
+    // Keep the copy control silent if clipboard access is unavailable.
   }
+}
+
+async function printPdf() {
+  if (!pdfDocument) {
+    return;
+  }
+
+  setToolsMenuOpen(false);
+  showToast("Preparing pages for print…");
+  await Promise.all(
+    Array.from({ length: pdfDocument.numPages }, (_, index) => renderPage(index + 1)),
+  );
+  window.print();
+}
+
+async function downloadPdf() {
+  if (!pdfDocument) {
+    return;
+  }
+
+  setToolsMenuOpen(false);
+  showToast("Preparing download…");
+  const data = await pdfDocument.getData();
+  const blob = new Blob([data], { type: "application/pdf" });
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 }
 
 function bindControls() {
   previousButton.addEventListener("click", () => goToPage(currentPage - 1));
   nextButton.addEventListener("click", () => goToPage(currentPage + 1));
   shareButton.addEventListener("click", () => void shareCurrentPage());
+  sectionToggle.addEventListener("click", toggleSectionPopover);
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!sectionPopover.hidden && !sectionNav.contains(event.target)) {
+      closeSectionPopover();
+    }
+  });
+  themeButton.addEventListener("click", toggleTheme);
+  toolsButton.addEventListener("click", () => {
+    setToolsMenuOpen(toolsMenu.hidden);
+  });
+
+  rotateLeftButton.addEventListener("click", () => void rotatePages(-90));
+  rotateRightButton.addEventListener("click", () => void rotatePages(90));
+  printButton.addEventListener("click", () => void printPdf());
+  downloadButton.addEventListener("click", () => void downloadPdf());
 
   pageNumberInput.addEventListener("change", () => {
     goToPage(Number.parseInt(pageNumberInput.value, 10) || currentPage);
@@ -417,8 +707,30 @@ function bindControls() {
     true,
   );
 
+  document.addEventListener("pointerdown", (event) => {
+    if (!toolsMenu.hidden && !tools.contains(event.target)) {
+      setToolsMenuOpen(false);
+    }
+  });
+
   document.addEventListener("keydown", (event) => {
-    if (document.activeElement === pageNumberInput || document.activeElement === searchInput) {
+    if (event.key === "Escape" && !toolsMenu.hidden) {
+      setToolsMenuOpen(false);
+      toolsButton.focus();
+      return;
+    }
+
+    if (event.key === "Escape" && !sectionPopover.hidden) {
+      closeSectionPopover();
+      sectionToggle.focus();
+      return;
+    }
+
+    if (
+      document.activeElement === pageNumberInput ||
+      document.activeElement === searchInput ||
+      sectionPopover.contains(document.activeElement)
+    ) {
       return;
     }
 
@@ -434,16 +746,21 @@ function bindControls() {
 }
 
 async function initialize() {
+  setTheme(localStorage.getItem(THEME_STORAGE_KEY) || "dark");
+
   if (!source) {
     throw new Error("No PDF URL was provided.");
   }
 
   originalUrl = new URL(source);
   const requestedPage = getInitialPage(originalUrl);
-  const requestUrl = new URL(originalUrl.href);
+  requestUrl = new URL(originalUrl.href);
   requestUrl.hash = "";
 
-  const fileName = decodeURIComponent(requestUrl.pathname.split("/").filter(Boolean).pop() || "PDF");
+  fileName = decodeURIComponent(requestUrl.pathname.split("/").filter(Boolean).pop() || "document.pdf");
+  if (!fileName.toLowerCase().endsWith(".pdf")) {
+    fileName += ".pdf";
+  }
   document.title = fileName;
 
   const loadingTask = getDocument({
@@ -468,6 +785,7 @@ async function initialize() {
   samplePage.cleanup();
   bindControls();
   observePages();
+  await initializeSectionNavigation();
   goToPage(currentPage, "auto");
   void renderPage(currentPage);
 }
@@ -478,6 +796,8 @@ initialize().catch((error) => {
   previousButton.disabled = true;
   nextButton.disabled = true;
   shareButton.disabled = true;
+  themeButton.disabled = true;
+  toolsButton.disabled = true;
   pageNumberInput.disabled = true;
   searchInput.disabled = true;
   searchPreviousButton.disabled = true;
