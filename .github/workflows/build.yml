@@ -15,3 +15,10 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run build
+      - run: npm run check
+      - name: Upload unpacked extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-viewer-extension
+          path: dist/
+          if-no-files-found: error

@@ -61,6 +61,7 @@ let rotation = 0;
 let pageElements = [];
 let scrollFrame;
 let toastTimer;
+let mimeHandlerActive = false;
 let searchTimer;
 let searchRequestId = 0;
 let completedSearchQuery = "";
@@ -91,9 +92,11 @@ function setCurrentPage(pageNumber) {
   previousButton.disabled = currentPage <= 1;
   nextButton.disabled = currentPage >= pdfDocument.numPages;
 
-  const viewerUrl = new URL(window.location.href);
-  viewerUrl.hash = `page=${currentPage}`;
-  history.replaceState(null, "", viewerUrl);
+  if (!mimeHandlerActive) {
+    const viewerUrl = new URL(window.location.href);
+    viewerUrl.hash = `page=${currentPage}`;
+    history.replaceState(null, "", viewerUrl);
+  }
 }
 
 function pageAtViewportCenter() {
@@ -132,6 +135,42 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add("visible");
   toastTimer = setTimeout(() => toast.classList.remove("visible"), 1800);
+}
+
+async function resolvePdfSource() {
+  if (chrome.mimeHandler?.getStreamInfo) {
+    try {
+      const streamInfo = await chrome.mimeHandler.getStreamInfo();
+      const response = await fetch(streamInfo.streamUrl);
+      if (!response.ok) {
+        throw new Error(`Could not read PDF stream (${response.status}).`);
+      }
+
+      const data = new Uint8Array(await response.arrayBuffer());
+      mimeHandlerActive = true;
+      return {
+        originalUrl: new URL(streamInfo.originalUrl),
+        data,
+      };
+    } catch (error) {
+      if (!source) {
+        throw error;
+      }
+    }
+  }
+
+  if (!source) {
+    throw new Error("No PDF URL or MIME-handler stream was provided.");
+  }
+
+  const fallbackOriginalUrl = new URL(source);
+  const requestUrl = new URL(fallbackOriginalUrl.href);
+  requestUrl.hash = "";
+
+  return {
+    originalUrl: fallbackOriginalUrl,
+    url: requestUrl.href,
+  };
 }
 
 function outlineHasDestination(items) {
@@ -747,12 +786,8 @@ function bindControls() {
 
 async function initialize() {
   setTheme(localStorage.getItem(THEME_STORAGE_KEY) || "dark");
-
-  if (!source) {
-    throw new Error("No PDF URL was provided.");
-  }
-
-  originalUrl = new URL(source);
+  const resolvedSource = await resolvePdfSource();
+  originalUrl = resolvedSource.originalUrl;
   const requestedPage = getInitialPage(originalUrl);
   requestUrl = new URL(originalUrl.href);
   requestUrl.hash = "";
@@ -763,9 +798,7 @@ async function initialize() {
   }
   document.title = fileName;
 
-  const loadingTask = getDocument({
-    url: requestUrl.href,
-    withCredentials: true,
+  const documentOptions = {
     cMapUrl: extensionAssetUrl("node_modules/pdfjs-dist/cmaps/", "cmaps/"),
     cMapPacked: true,
     standardFontDataUrl: extensionAssetUrl(
@@ -773,8 +806,16 @@ async function initialize() {
       "standard_fonts/",
     ),
     wasmUrl: extensionAssetUrl("node_modules/pdfjs-dist/wasm/", "wasm/"),
-  });
+  };
 
+  if (resolvedSource.data) {
+    documentOptions.data = resolvedSource.data;
+  } else {
+    documentOptions.url = resolvedSource.url;
+    documentOptions.withCredentials = true;
+  }
+
+  const loadingTask = getDocument(documentOptions);
   pdfDocument = await loadingTask.promise;
   currentPage = Math.min(requestedPage, pdfDocument.numPages);
   pageCount.textContent = String(pdfDocument.numPages);
@@ -790,7 +831,16 @@ async function initialize() {
   void renderPage(currentPage);
 }
 
-initialize().catch((error) => {
+initialize().catch(async (error) => {
+  if (mimeHandlerActive && chrome.mimeHandler?.abortAndFallbackToNativeHandler) {
+    try {
+      await chrome.mimeHandler.abortAndFallbackToNativeHandler();
+      return;
+    } catch {
+      // If native fallback itself fails, show the viewer error below.
+    }
+  }
+
   status.classList.add("error");
   status.textContent = `Could not open this PDF. ${error?.message || error}`;
   previousButton.disabled = true;
