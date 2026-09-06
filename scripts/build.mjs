@@ -27,6 +27,8 @@ await Promise.all([
   cp("src/background.js", `${outdir}/background.js`),
   cp("src/viewer.html", `${outdir}/viewer.html`),
   cp("src/viewer.css", `${outdir}/viewer.css`),
+  cp("src/image-color-toggle.css", `${outdir}/image-color-toggle.css`),
+  cp("src/image-color-toggle.js", `${outdir}/image-color-toggle.js`),
   cp("src/close-tab-shortcut.js", `${outdir}/close-tab-shortcut.js`),
   cp("src/assets", `${outdir}/assets`, { recursive: true }),
   cp("node_modules/pdfjs-dist/build/pdf.worker.min.mjs", `${outdir}/pdf.worker.min.mjs`),
