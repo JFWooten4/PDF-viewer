@@ -13,6 +13,11 @@ manifest.icons = Object.fromEntries(
 );
 manifest.action.default_icon = manifest.action.default_icon.replace("src/", "");
 
+for (const contentScript of manifest.content_scripts || []) {
+  contentScript.js = contentScript.js?.map((script) => script.replace(/^src\//, ""));
+  contentScript.css = contentScript.css?.map((stylesheet) => stylesheet.replace(/^src\//, ""));
+}
+
 await Promise.all([
   build({
     entryPoints: ["src/viewer.js"],
@@ -27,6 +32,8 @@ await Promise.all([
   cp("src/background.js", `${outdir}/background.js`),
   cp("src/viewer.html", `${outdir}/viewer.html`),
   cp("src/viewer.css", `${outdir}/viewer.css`),
+  cp("src/viewer-settings.js", `${outdir}/viewer-settings.js`),
+  cp("src/sec-comment.js", `${outdir}/sec-comment.js`),
   cp("src/assets", `${outdir}/assets`, { recursive: true }),
   cp("node_modules/pdfjs-dist/build/pdf.worker.min.mjs", `${outdir}/pdf.worker.min.mjs`),
   cp("node_modules/pdfjs-dist/cmaps", `${outdir}/cmaps`, { recursive: true }),
