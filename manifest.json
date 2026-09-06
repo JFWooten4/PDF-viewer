@@ -8,8 +8,15 @@
   "background": {
     "service_worker": "src/background.js"
   },
+  "icons": {
+    "16": "src/assets/luna-mark.png",
+    "32": "src/assets/luna-mark.png",
+    "48": "src/assets/luna-mark.png",
+    "128": "src/assets/luna-mark.png"
+  },
   "action": {
-    "default_title": "Open in dark PDF viewer"
+    "default_title": "Open in dark PDF viewer",
+    "default_icon": "src/assets/luna-mark.png"
   },
   "mime_types_handler": {
     "application/pdf": {
