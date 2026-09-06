@@ -7,9 +7,9 @@ A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF
 - Automatically opens URLs ending in `.pdf` in the extension viewer.
 - Also detects main-frame responses with `Content-Type: application/pdf`, so PDF endpoints do not need a `.pdf` suffix.
 - Renders PDFs locally with bundled PDF.js assets; no remotely hosted executable code is used.
-- Supports dark and light viewing modes, remembers the selected theme, and uses packaged Luna/Nightmare Moon and Celestia cutie-mark artwork for the theme control. See `CREDITS.md` for attribution.
+- Supports dark and light viewing modes and remembers the selected theme.
 - Tracks the page currently centered in the viewport.
-- **Share page** shares the original document URL as `#page=<current page>`; when the Web Share API is unavailable, the link is copied to the clipboard.
+- Copies the original document URL as `#page=<current page>` silently when the mark is clicked.
 - Honors an existing `#page=N` fragment when opening a document.
 - Keeps less-used PDF actions in a **More tools** menu with rotate left/right, print, and download.
 - Keeps the More tools menu open across repeated rotate actions.

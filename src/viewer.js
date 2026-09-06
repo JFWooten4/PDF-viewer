@@ -18,8 +18,6 @@ const nextButton = document.querySelector("#next-page");
 const pageNumberInput = document.querySelector("#page-number");
 const pageCount = document.querySelector("#page-count");
 const shareButton = document.querySelector("#share-page");
-const themeButton = document.querySelector("#theme-toggle");
-const themeIcon = document.querySelector("#theme-icon");
 const tools = document.querySelector("#tools");
 const toolsButton = document.querySelector("#tools-button");
 const toolsMenu = document.querySelector("#tools-menu");
@@ -32,8 +30,6 @@ const toast = document.querySelector("#toast");
 const params = new URLSearchParams(window.location.search);
 const source = params.get("url");
 const THEME_STORAGE_KEY = "pdf-viewer-theme";
-const LUNA_ICON = extensionAssetUrl("src/assets/luna-mark.png", "assets/luna-mark.png");
-const CELESTIA_ICON = extensionAssetUrl("src/assets/celestia-mark.png", "assets/celestia-mark.png");
 
 let pdfDocument;
 let originalUrl;
@@ -121,15 +117,6 @@ function setTheme(theme) {
   document.documentElement.dataset.theme = nextTheme;
   localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
 
-  const isDark = nextTheme === "dark";
-  themeIcon.classList.toggle("celestia-icon", isDark);
-  themeIcon.src = isDark ? CELESTIA_ICON : LUNA_ICON;
-  themeButton.title = isDark ? "Switch to light mode" : "Switch to dark mode";
-  themeButton.setAttribute("aria-label", themeButton.title);
-}
-
-function toggleTheme() {
-  setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 }
 
 async function renderPage(pageNumber) {
@@ -256,22 +243,10 @@ async function shareCurrentPage() {
   const shareUrl = new URL(originalUrl.href);
   shareUrl.hash = `page=${currentPage}`;
 
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: document.title, url: shareUrl.href });
-      return;
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        return;
-      }
-    }
-  }
-
   try {
     await navigator.clipboard.writeText(shareUrl.href);
-    showToast(`Copied page ${currentPage} link`);
   } catch {
-    window.prompt("Copy this page link:", shareUrl.href);
+    // Keep the copy control silent if clipboard access is unavailable.
   }
 }
 
@@ -311,7 +286,6 @@ function bindControls() {
   previousButton.addEventListener("click", () => goToPage(currentPage - 1));
   nextButton.addEventListener("click", () => goToPage(currentPage + 1));
   shareButton.addEventListener("click", () => void shareCurrentPage());
-  themeButton.addEventListener("click", toggleTheme);
   toolsButton.addEventListener("click", () => {
     setToolsMenuOpen(toolsMenu.hidden);
   });
@@ -409,7 +383,6 @@ initialize().catch((error) => {
   previousButton.disabled = true;
   nextButton.disabled = true;
   shareButton.disabled = true;
-  themeButton.disabled = true;
   toolsButton.disabled = true;
   pageNumberInput.disabled = true;
 });

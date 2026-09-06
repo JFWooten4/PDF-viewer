@@ -67,7 +67,6 @@ input {
 }
 
 .icon-button,
-.share-button,
 .page-control {
   min-height: 34px;
   border: 1px solid var(--border);
@@ -77,7 +76,7 @@ input {
 }
 
 .icon-button,
-.share-button,
+.mark-button,
 .tool-button {
   cursor: pointer;
 }
@@ -88,7 +87,7 @@ input {
   font-size: 18px;
 }
 
-.theme-button {
+.mark-button {
   display: grid;
   place-items: center;
   width: 30px;
@@ -100,34 +99,24 @@ input {
   overflow: hidden;
 }
 
-.theme-button img {
-  width: 20px;
-  height: 20px;
+.mark-button img {
+  width: 28px;
+  height: 28px;
   object-fit: contain;
 }
 
-.theme-button img.celestia-icon {
-  transform: scale(1.12);
-}
-
-.theme-button:disabled {
+.mark-button:disabled {
   cursor: default;
   opacity: 0.45;
 }
 
-.share-button {
-  padding: 0 13px;
-  font-weight: 600;
-}
-
 .icon-button:hover,
-.share-button:hover,
 .tool-button:hover {
   background: var(--control-hover);
 }
 
 .icon-button:disabled,
-.share-button:disabled {
+.mark-button:disabled {
   cursor: default;
   opacity: 0.45;
 }
@@ -282,10 +271,6 @@ input {
   .toolbar {
     gap: 5px;
     padding-inline: 8px;
-  }
-
-  .share-button {
-    padding-inline: 10px;
   }
 
   .page-control {
