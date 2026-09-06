@@ -89,6 +89,10 @@
   outline-offset: 2px;
 }
 
+.page canvas.page-image-overlay {
+  background: transparent;
+}
+
 :root[data-preserve-image-colors="false"] .page-image-overlay {
   display: none !important;
 }
