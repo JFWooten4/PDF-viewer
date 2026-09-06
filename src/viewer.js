@@ -204,6 +204,38 @@ function outlineHasDestination(items) {
   );
 }
 
+function sectionReferenceFromTitle(title) {
+  const match = title.match(
+    /^((?:[IVXLCDM]+|[A-Z]|\d+|[a-z])(?:\.(?:[IVXLCDM]+|[A-Z]|\d+|[a-z]))*)\.?(?=\s|$)/,
+  );
+  return match?.[1] || "";
+}
+
+function fullSectionReference(parentReference, localReference) {
+  if (!parentReference || localReference.includes(".")) {
+    return localReference;
+  }
+
+  return `${parentReference}.${localReference}`;
+}
+
+function fallbackSectionReference(parentReference, position) {
+  return parentReference ? `${parentReference}.${position}` : String(position);
+}
+
+function fallbackSectionCopyText(reference, title) {
+  return `${reference} ("${title}")`;
+}
+
+async function copySectionReference(reference) {
+  try {
+    await navigator.clipboard.writeText(reference);
+    showToast(`Copied ${reference}`);
+  } catch {
+    showToast("Could not copy section reference");
+  }
+}
+
 function closeSectionPopover() {
   sectionPopover.hidden = true;
   sectionToggle.setAttribute("aria-expanded", "false");
@@ -243,8 +275,9 @@ async function navigateToOutlineItem(item) {
   }
 }
 
-function createOutlineList(items) {
+function createOutlineList(items, parentReference = "") {
   const list = document.createElement("ul");
+  let visiblePosition = 0;
 
   for (const item of items) {
     const children = item.items || [];
@@ -256,8 +289,19 @@ function createOutlineList(items) {
       continue;
     }
 
+    visiblePosition += 1;
+    const localReference = sectionReferenceFromTitle(title);
+    const hasExplicitReference = Boolean(localReference);
+    const sectionReference = hasExplicitReference
+      ? fullSectionReference(parentReference, localReference)
+      : fallbackSectionReference(parentReference, visiblePosition);
+    const copyText = hasExplicitReference
+      ? sectionReference
+      : fallbackSectionCopyText(sectionReference, title);
     const entry = document.createElement("li");
+    const row = document.createElement("div");
     entry.className = "section-entry";
+    row.className = "section-entry-row";
 
     if (hasDestination) {
       const button = document.createElement("button");
@@ -265,16 +309,27 @@ function createOutlineList(items) {
       button.className = "section-link";
       button.textContent = title;
       button.addEventListener("click", () => void navigateToOutlineItem(item));
-      entry.append(button);
+      row.append(button);
     } else {
       const heading = document.createElement("span");
       heading.className = "section-heading";
       heading.textContent = title;
-      entry.append(heading);
+      row.append(heading);
     }
 
+    const copyButton = document.createElement("button");
+    copyButton.type = "button";
+    copyButton.className = "section-copy";
+    copyButton.textContent = "⧉";
+    copyButton.title = `Copy section reference ${copyText}`;
+    copyButton.setAttribute("aria-label", copyButton.title);
+    copyButton.addEventListener("click", () => void copySectionReference(copyText));
+    row.append(copyButton);
+
+    entry.append(row);
+
     if (hasChildDestination) {
-      entry.append(createOutlineList(children));
+      entry.append(createOutlineList(children, sectionReference));
     }
 
     list.append(entry);
