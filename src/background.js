@@ -1,6 +1,7 @@
 const serviceWorkerPath = chrome.runtime.getManifest().background?.service_worker || "";
 const sourcePrefix = serviceWorkerPath.startsWith("src/") ? "src/" : "";
 const VIEWER_URL = chrome.runtime.getURL(`${sourcePrefix}viewer.html`);
+const hasMimeHandler = Boolean(chrome.mimeHandler);
 
 function isViewerUrl(url) {
   return typeof url === "string" && url.startsWith(VIEWER_URL);
@@ -34,32 +35,34 @@ async function openInViewer(tabId, pdfUrl) {
   }
 }
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (isLikelyPdfUrl(changeInfo.url)) {
-    void openInViewer(tabId, changeInfo.url);
-  }
-});
-
-chrome.webRequest.onHeadersReceived.addListener(
-  (details) => {
-    if (details.tabId < 0 || isViewerUrl(details.url)) {
-      return;
+if (!hasMimeHandler) {
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (isLikelyPdfUrl(changeInfo.url)) {
+      void openInViewer(tabId, changeInfo.url);
     }
+  });
 
-    const contentType = details.responseHeaders?.find(
-      (header) => header.name.toLowerCase() === "content-type",
-    )?.value;
+  chrome.webRequest.onHeadersReceived.addListener(
+    (details) => {
+      if (details.tabId < 0 || isViewerUrl(details.url)) {
+        return;
+      }
 
-    if (contentType?.toLowerCase().includes("application/pdf")) {
-      void openInViewer(details.tabId, details.url);
-    }
-  },
-  { urls: ["<all_urls>"], types: ["main_frame"] },
-  ["responseHeaders"],
-);
+      const contentType = details.responseHeaders?.find(
+        (header) => header.name.toLowerCase() === "content-type",
+      )?.value;
+
+      if (contentType?.toLowerCase().includes("application/pdf")) {
+        void openInViewer(details.tabId, details.url);
+      }
+    },
+    { urls: ["<all_urls>"], types: ["main_frame"] },
+    ["responseHeaders"],
+  );
+}
 
 chrome.action.onClicked.addListener((tab) => {
-  if (tab.id != null && tab.url && !isViewerUrl(tab.url)) {
+  if (!hasMimeHandler && tab.id != null && isLikelyPdfUrl(tab.url)) {
     void openInViewer(tab.id, tab.url);
   }
 });

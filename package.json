@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check-extension.mjs"
   },
   "dependencies": {
     "pdfjs-dist": "6.3.289"
