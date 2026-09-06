@@ -11,7 +11,7 @@ A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF
 - Tracks the page currently centered in the viewport.
 - Copies the original document URL as `#page=<current page>` silently when the mark is clicked.
 - Honors an existing `#page=N` fragment when opening a document.
-- Keeps less-used PDF actions in a **More tools** menu with rotate left/right, print, and download.
+- Places Download beside the page-link icon and keeps rotate left/right and print in the **More tools** menu.
 - Keeps the More tools menu open across repeated rotate actions.
 - Lazy-renders nearby pages so long filings do not render every page up front.
 
@@ -50,4 +50,4 @@ Open a PDF normally. The extension redirects the tab to its own viewer while ret
 https://example.com/document.pdf#page=42
 ```
 
-The toolbar also supports previous/next page navigation, direct page entry, a remembered light/dark toggle, and a compact More tools menu for rotate, print, and download.
+The toolbar also supports previous/next page navigation, direct page entry, page-link copying, download, and a compact More tools menu for rotate and print.
