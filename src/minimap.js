@@ -70,7 +70,7 @@ function documentMetrics() {
 }
 
 function syncMinimap() {
-  if (!minimap || minimap.offsetParent === null) {
+  if (!minimap || minimap.clientHeight === 0) {
     return;
   }
 
