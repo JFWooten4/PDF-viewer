@@ -114,7 +114,7 @@ input {
   overflow-wrap: anywhere;
 }
 
-.section-document-title + .section-popover-title {
+.section-document-title:not([hidden]) + .section-popover-title {
   padding-top: 8px;
 }
 
