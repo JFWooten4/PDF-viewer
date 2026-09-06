@@ -114,7 +114,27 @@ function goToPage(pageNumber, behavior = "smooth") {
 
   const nextPage = Math.min(Math.max(pageNumber, 1), pdfDocument.numPages);
   setCurrentPage(nextPage);
-  pageElements[nextPage - 1]?.scrollIntoView({ behavior, block: "center" });
+
+  const pageElement = pageElements[nextPage - 1];
+  if (!pageElement) {
+    return;
+  }
+
+  const toolbarHeight = 52;
+  const pageGap = 24;
+  const readableHeight = window.innerHeight - toolbarHeight - pageGap * 2;
+  const pageRect = pageElement.getBoundingClientRect();
+
+  if (pageRect.height <= readableHeight) {
+    pageElement.scrollIntoView({ behavior, block: "center" });
+    return;
+  }
+
+  const pageTop = window.scrollY + pageRect.top;
+  window.scrollTo({
+    top: Math.max(0, pageTop - toolbarHeight - pageGap),
+    behavior,
+  });
 }
 
 function showToast(message) {
@@ -522,13 +542,7 @@ async function initialize() {
   bindControls();
   observePages();
   await initializeSectionNavigation();
-  if (currentPage === 1) {
-    previousButton.disabled = true;
-    nextButton.disabled = pdfDocument.numPages <= 1;
-    window.scrollTo({ top: 0, behavior: "auto" });
-  } else {
-    goToPage(currentPage, "auto");
-  }
+  goToPage(currentPage, "auto");
   void renderPage(currentPage);
 }
 
