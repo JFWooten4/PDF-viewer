@@ -8,10 +8,16 @@ await mkdir(outdir, { recursive: true });
 
 const manifest = JSON.parse(await readFile("manifest.json", "utf8"));
 manifest.background.service_worker = "background.js";
+manifest.mime_types_handler["application/pdf"].handler_url = "viewer.html";
 manifest.icons = Object.fromEntries(
   Object.entries(manifest.icons).map(([size, icon]) => [size, icon.replace("src/", "")]),
 );
 manifest.action.default_icon = manifest.action.default_icon.replace("src/", "");
+
+for (const contentScript of manifest.content_scripts || []) {
+  contentScript.js = contentScript.js?.map((script) => script.replace(/^src\//, ""));
+  contentScript.css = contentScript.css?.map((stylesheet) => stylesheet.replace(/^src\//, ""));
+}
 
 await Promise.all([
   build({
@@ -27,6 +33,9 @@ await Promise.all([
   cp("src/background.js", `${outdir}/background.js`),
   cp("src/viewer.html", `${outdir}/viewer.html`),
   cp("src/viewer.css", `${outdir}/viewer.css`),
+  cp("src/viewer-settings.js", `${outdir}/viewer-settings.js`),
+  cp("src/sec-comment.js", `${outdir}/sec-comment.js`),
+  cp("src/close-tab-shortcut.js", `${outdir}/close-tab-shortcut.js`),
   cp("src/assets", `${outdir}/assets`, { recursive: true }),
   cp("node_modules/pdfjs-dist/build/pdf.worker.min.mjs", `${outdir}/pdf.worker.min.mjs`),
   cp("node_modules/pdfjs-dist/cmaps", `${outdir}/cmaps`, { recursive: true }),
