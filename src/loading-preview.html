@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PDF Viewer — Loading Preview</title>
+    <link rel="stylesheet" href="viewer.css" />
+  </head>
+  <body>
+    <header class="toolbar" aria-label="PDF controls">
+      <button class="icon-button" type="button" aria-label="Previous page" title="Previous page">←</button>
+      <label class="page-control" aria-label="Current page">
+        <input type="number" min="1" value="1" inputmode="numeric" />
+        <span>/ <span>—</span></span>
+      </label>
+      <button class="icon-button" type="button" aria-label="Next page" title="Next page">→</button>
+      <div class="spacer"></div>
+      <button class="mark-button theme-button" type="button" aria-label="Switch to light mode" title="Switch to light mode">
+        <img class="celestia-icon" src="assets/celestia-mark.png" alt="" aria-hidden="true" />
+      </button>
+      <button class="mark-button" type="button" aria-label="Copy page link" title="Copy page link">
+        <img src="assets/copy-page-icon.png" alt="" aria-hidden="true" />
+      </button>
+      <button class="mark-button" type="button" aria-label="Download PDF" title="Download PDF">
+        <img src="assets/download-icon.png" alt="" aria-hidden="true" />
+      </button>
+      <div class="tools">
+        <button class="icon-button" type="button" aria-label="More PDF tools" title="More PDF tools">⋯</button>
+      </div>
+    </header>
+
+    <main class="viewer" aria-live="polite">
+      <div class="status">Loading PDF…</div>
+    </main>
+  </body>
+</html>
