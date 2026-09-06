@@ -8,6 +8,7 @@ await mkdir(outdir, { recursive: true });
 
 const manifest = JSON.parse(await readFile("manifest.json", "utf8"));
 manifest.background.service_worker = "background.js";
+manifest.mime_types_handler["application/pdf"].handler_url = "viewer.html";
 
 await Promise.all([
   build({
