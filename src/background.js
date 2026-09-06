@@ -1,4 +1,6 @@
-const VIEWER_URL = chrome.runtime.getURL("viewer.html");
+const serviceWorkerPath = chrome.runtime.getManifest().background?.service_worker || "";
+const sourcePrefix = serviceWorkerPath.startsWith("src/") ? "src/" : "";
+const VIEWER_URL = chrome.runtime.getURL(`${sourcePrefix}viewer.html`);
 
 function isViewerUrl(url) {
   return typeof url === "string" && url.startsWith(VIEWER_URL);

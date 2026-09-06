@@ -1,6 +1,15 @@
-import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+import { getDocument, GlobalWorkerOptions } from "../node_modules/pdfjs-dist/build/pdf.mjs";
 
-GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("pdf.worker.min.mjs");
+const sourceMode = window.location.pathname.includes("/src/");
+
+function extensionAssetUrl(sourcePath, builtPath) {
+  return chrome.runtime.getURL(sourceMode ? sourcePath : builtPath);
+}
+
+GlobalWorkerOptions.workerSrc = extensionAssetUrl(
+  "node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
+  "pdf.worker.min.mjs",
+);
 
 const viewer = document.querySelector("#viewer");
 const status = document.querySelector("#status");
@@ -384,10 +393,13 @@ async function initialize() {
   const loadingTask = getDocument({
     url: requestUrl.href,
     withCredentials: true,
-    cMapUrl: chrome.runtime.getURL("cmaps/"),
+    cMapUrl: extensionAssetUrl("node_modules/pdfjs-dist/cmaps/", "cmaps/"),
     cMapPacked: true,
-    standardFontDataUrl: chrome.runtime.getURL("standard_fonts/"),
-    wasmUrl: chrome.runtime.getURL("wasm/"),
+    standardFontDataUrl: extensionAssetUrl(
+      "node_modules/pdfjs-dist/standard_fonts/",
+      "standard_fonts/",
+    ),
+    wasmUrl: extensionAssetUrl("node_modules/pdfjs-dist/wasm/", "wasm/"),
   });
 
   pdfDocument = await loadingTask.promise;
