@@ -9,6 +9,10 @@ const nextButton = document.querySelector("#next-page");
 const pageNumberInput = document.querySelector("#page-number");
 const pageCount = document.querySelector("#page-count");
 const shareButton = document.querySelector("#share-page");
+const sectionNav = document.querySelector("#section-nav");
+const sectionToggle = document.querySelector("#section-toggle");
+const sectionPopover = document.querySelector("#section-popover");
+const sectionList = document.querySelector("#section-list");
 const toast = document.querySelector("#toast");
 
 const params = new URLSearchParams(window.location.search);
@@ -84,6 +88,113 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add("visible");
   toastTimer = setTimeout(() => toast.classList.remove("visible"), 1800);
+}
+
+function outlineHasDestination(items) {
+  return items.some(
+    (item) => Boolean(item.dest) || (item.items?.length && outlineHasDestination(item.items)),
+  );
+}
+
+function closeSectionPopover() {
+  sectionPopover.hidden = true;
+  sectionToggle.setAttribute("aria-expanded", "false");
+}
+
+function toggleSectionPopover() {
+  const opening = sectionPopover.hidden;
+  sectionPopover.hidden = !opening;
+  sectionToggle.setAttribute("aria-expanded", String(opening));
+}
+
+async function navigateToOutlineItem(item) {
+  try {
+    let destination = item.dest;
+
+    if (typeof destination === "string") {
+      destination = await pdfDocument.getDestination(destination);
+    }
+
+    if (!Array.isArray(destination) || destination.length === 0) {
+      return;
+    }
+
+    const pageReference = destination[0];
+    let pageIndex;
+
+    if (Number.isInteger(pageReference)) {
+      pageIndex = pageReference;
+    } else {
+      pageIndex = await pdfDocument.getPageIndex(pageReference);
+    }
+
+    goToPage(pageIndex + 1);
+    closeSectionPopover();
+  } catch {
+    showToast("Could not open that section");
+  }
+}
+
+function createOutlineList(items) {
+  const list = document.createElement("ul");
+
+  for (const item of items) {
+    const children = item.items || [];
+    const hasDestination = Boolean(item.dest);
+    const hasChildDestination = children.length > 0 && outlineHasDestination(children);
+    const title = item.title?.trim();
+
+    if (!title || (!hasDestination && !hasChildDestination)) {
+      continue;
+    }
+
+    const entry = document.createElement("li");
+    entry.className = "section-entry";
+
+    if (hasDestination) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "section-link";
+      button.textContent = title;
+      button.addEventListener("click", () => void navigateToOutlineItem(item));
+      entry.append(button);
+    } else {
+      const heading = document.createElement("span");
+      heading.className = "section-heading";
+      heading.textContent = title;
+      entry.append(heading);
+    }
+
+    if (hasChildDestination) {
+      entry.append(createOutlineList(children));
+    }
+
+    list.append(entry);
+  }
+
+  return list;
+}
+
+async function initializeSectionNavigation() {
+  let outline;
+
+  try {
+    outline = await pdfDocument.getOutline();
+  } catch {
+    return;
+  }
+
+  if (!outline?.length || !outlineHasDestination(outline)) {
+    return;
+  }
+
+  const outlineList = createOutlineList(outline);
+  if (!outlineList.childElementCount) {
+    return;
+  }
+
+  sectionList.replaceChildren(outlineList);
+  sectionNav.hidden = false;
 }
 
 async function renderPage(pageNumber) {
@@ -197,6 +308,13 @@ function bindControls() {
   previousButton.addEventListener("click", () => goToPage(currentPage - 1));
   nextButton.addEventListener("click", () => goToPage(currentPage + 1));
   shareButton.addEventListener("click", () => void shareCurrentPage());
+  sectionToggle.addEventListener("click", toggleSectionPopover);
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!sectionPopover.hidden && !sectionNav.contains(event.target)) {
+      closeSectionPopover();
+    }
+  });
 
   pageNumberInput.addEventListener("change", () => {
     goToPage(Number.parseInt(pageNumberInput.value, 10) || currentPage);
@@ -209,7 +327,13 @@ function bindControls() {
   });
 
   document.addEventListener("keydown", (event) => {
-    if (document.activeElement === pageNumberInput) {
+    if (event.key === "Escape" && !sectionPopover.hidden) {
+      closeSectionPopover();
+      sectionToggle.focus();
+      return;
+    }
+
+    if (document.activeElement === pageNumberInput || sectionPopover.contains(document.activeElement)) {
       return;
     }
 
@@ -256,6 +380,7 @@ async function initialize() {
   samplePage.cleanup();
   bindControls();
   observePages();
+  await initializeSectionNavigation();
   goToPage(currentPage, "auto");
   void renderPage(currentPage);
 }
