@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PDF Viewer</title>
+    <link rel="stylesheet" href="viewer.css" />
+  </head>
+  <body>
+    <header class="toolbar" aria-label="PDF controls">
+      <button id="previous-page" class="icon-button" type="button" aria-label="Previous page" title="Previous page">←</button>
+      <label class="page-control" aria-label="Current page">
+        <input id="page-number" type="number" min="1" value="1" inputmode="numeric" />
+        <span>/ <span id="page-count">—</span></span>
+      </label>
+      <button id="next-page" class="icon-button" type="button" aria-label="Next page" title="Next page">→</button>
+      <div class="spacer"></div>
+      <button id="share-page" class="share-button" type="button">Share page</button>
+    </header>
+
+    <main id="viewer" class="viewer" aria-live="polite">
+      <div id="status" class="status">Loading PDF…</div>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="viewer.js"></script>
+  </body>
+</html>
