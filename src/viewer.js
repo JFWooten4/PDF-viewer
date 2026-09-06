@@ -48,7 +48,6 @@ const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
   "assets/copy-page-icon-light.png",
 );
 const SCANNED_PAGE_IMAGE_AREA_THRESHOLD = 0.8;
-const SVG_NS = "http://www.w3.org/2000/svg";
 
 let pdfDocument;
 let originalUrl;
@@ -92,45 +91,10 @@ function clampUnit(value) {
   return Math.min(1, Math.max(0, value));
 }
 
-function createImageClipDefinition(imageCoordinates, pageNumber, generation) {
-  const svg = document.createElementNS(SVG_NS, "svg");
-  const definitions = document.createElementNS(SVG_NS, "defs");
-  const clipPath = document.createElementNS(SVG_NS, "clipPath");
-  const clipId = `pdf-image-clip-${pageNumber}-${generation}`;
-
-  svg.setAttribute("aria-hidden", "true");
-  svg.style.position = "absolute";
-  svg.style.width = "0";
-  svg.style.height = "0";
-  svg.style.pointerEvents = "none";
-  clipPath.id = clipId;
-  clipPath.setAttribute("clipPathUnits", "objectBoundingBox");
-
-  for (let offset = 0; offset + 5 < imageCoordinates.length; offset += 6) {
-    const topLeftX = clampUnit(imageCoordinates[offset]);
-    const topLeftY = clampUnit(imageCoordinates[offset + 1]);
-    const bottomLeftX = clampUnit(imageCoordinates[offset + 2]);
-    const bottomLeftY = clampUnit(imageCoordinates[offset + 3]);
-    const topRightX = clampUnit(imageCoordinates[offset + 4]);
-    const topRightY = clampUnit(imageCoordinates[offset + 5]);
-    const bottomRightX = clampUnit(bottomLeftX + topRightX - topLeftX);
-    const bottomRightY = clampUnit(bottomLeftY + topRightY - topLeftY);
-    const polygon = document.createElementNS(SVG_NS, "polygon");
-
-    polygon.setAttribute(
-      "points",
-      `${topLeftX},${topLeftY} ${bottomLeftX},${bottomLeftY} ${bottomRightX},${bottomRightY} ${topRightX},${topRightY}`,
-    );
-    clipPath.append(polygon);
-  }
-
-  definitions.append(clipPath);
-  svg.append(definitions);
-  return { svg, clipId };
-}
-
-function createImageOverlayCanvas(baseCanvas, viewport, clipId) {
+function createImageOverlayCanvas(baseCanvas, viewport, imageCoordinates) {
   const overlay = document.createElement("canvas");
+  const context = overlay.getContext("2d", { alpha: true });
+
   overlay.className = "page-image-overlay";
   overlay.setAttribute("aria-hidden", "true");
   overlay.width = baseCanvas.width;
@@ -142,9 +106,28 @@ function createImageOverlayCanvas(baseCanvas, viewport, clipId) {
   overlay.style.zIndex = "1";
   overlay.style.pointerEvents = "none";
   overlay.style.filter = "none";
-  overlay.style.clipPath = `url(#${clipId})`;
-  overlay.style.webkitClipPath = `url(#${clipId})`;
   overlay.style.display = document.documentElement.dataset.theme === "dark" ? "block" : "none";
+
+  context.beginPath();
+  for (let offset = 0; offset + 5 < imageCoordinates.length; offset += 6) {
+    const topLeftX = clampUnit(imageCoordinates[offset]) * overlay.width;
+    const topLeftY = clampUnit(imageCoordinates[offset + 1]) * overlay.height;
+    const bottomLeftX = clampUnit(imageCoordinates[offset + 2]) * overlay.width;
+    const bottomLeftY = clampUnit(imageCoordinates[offset + 3]) * overlay.height;
+    const topRightX = clampUnit(imageCoordinates[offset + 4]) * overlay.width;
+    const topRightY = clampUnit(imageCoordinates[offset + 5]) * overlay.height;
+    const bottomRightX = bottomLeftX + topRightX - topLeftX;
+    const bottomRightY = bottomLeftY + topRightY - topLeftY;
+
+    context.moveTo(topLeftX, topLeftY);
+    context.lineTo(bottomLeftX, bottomLeftY);
+    context.lineTo(bottomRightX, bottomRightY);
+    context.lineTo(topRightX, topRightY);
+    context.closePath();
+  }
+  context.clip();
+  context.drawImage(baseCanvas, 0, 0);
+
   return overlay;
 }
 
@@ -385,31 +368,14 @@ async function renderPage(pageNumber) {
       return;
     }
 
-    let clipDefinition;
     let imageOverlay;
     const imageCoordinates = renderTask.imageCoordinates;
     if (imageCoordinates?.length && !hasPageSizedImage(imageCoordinates)) {
-      clipDefinition = createImageClipDefinition(imageCoordinates, pageNumber, generation);
-      imageOverlay = createImageOverlayCanvas(canvas, viewport, clipDefinition.clipId);
-      const imageContext = imageOverlay.getContext("2d", { alpha: false });
-
-      await page.render({
-        canvasContext: imageContext,
-        viewport,
-        transform: renderTransform,
-      }).promise;
-    }
-
-    if (generation !== renderGeneration) {
-      page.cleanup();
-      return;
+      imageOverlay = createImageOverlayCanvas(canvas, viewport, imageCoordinates);
     }
 
     container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
-    container.replaceChildren(
-      canvas,
-      ...(clipDefinition ? [clipDefinition.svg, imageOverlay] : []),
-    );
+    container.replaceChildren(canvas, ...(imageOverlay ? [imageOverlay] : []));
     container.classList.add("rendered");
     renderedPages.add(pageNumber);
     page.cleanup();
