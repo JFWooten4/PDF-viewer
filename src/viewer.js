@@ -68,7 +68,9 @@ let completedSearchQuery = "";
 let searchMatches = [];
 let activeSearchIndex = -1;
 let renderGeneration = 0;
-const renderPromises = new Map();
+let renderQueuePromise;
+const priorityRenderQueue = new Set();
+const backgroundRenderQueue = new Set();
 const renderedPages = new Set();
 const pageTextCache = new Map();
 
@@ -91,6 +93,7 @@ function setCurrentPage(pageNumber) {
   pageNumberInput.value = String(currentPage);
   previousButton.disabled = currentPage <= 1;
   nextButton.disabled = currentPage >= pdfDocument.numPages;
+  void queuePageRender(currentPage, true);
 
   if (!mimeHandlerActive) {
     const viewerUrl = new URL(window.location.href);
@@ -127,6 +130,7 @@ function goToPage(pageNumber, behavior = "smooth") {
 
   const nextPage = Math.min(Math.max(pageNumber, 1), pdfDocument.numPages);
   setCurrentPage(nextPage);
+  void queuePageRender(nextPage, true);
   pageElements[nextPage - 1]?.scrollIntoView({ behavior, block: "center" });
 }
 
@@ -345,74 +349,127 @@ function refreshSearchHighlights(query = completedSearchQuery) {
   }
 }
 
-async function renderPage(pageNumber) {
+function yieldToBrowser() {
+  return new Promise((resolve) => requestAnimationFrame(resolve));
+}
+
+function takeNextQueuedPage() {
+  const queue = priorityRenderQueue.size > 0 ? priorityRenderQueue : backgroundRenderQueue;
+  if (queue.size === 0) {
+    return undefined;
+  }
+
+  let pageNumber;
+  for (const queuedPage of queue) {
+    if (pageNumber === undefined || queuedPage < pageNumber) {
+      pageNumber = queuedPage;
+    }
+  }
+
+  queue.delete(pageNumber);
+  return pageNumber;
+}
+
+async function renderPageNow(pageNumber) {
   if (renderedPages.has(pageNumber)) {
     return;
   }
 
-  if (renderPromises.has(pageNumber)) {
-    return renderPromises.get(pageNumber);
+  const generation = renderGeneration;
+  const page = await pdfDocument.getPage(pageNumber);
+  const container = pageElements[pageNumber - 1];
+  const baseViewport = page.getViewport({ scale: 1, rotation });
+  const cssWidth = Math.max(280, container.clientWidth);
+  const viewport = page.getViewport({ scale: cssWidth / baseViewport.width, rotation });
+  const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { alpha: false });
+  const textLayer = document.createElement("div");
+  textLayer.className = "text-layer";
+
+  canvas.width = Math.floor(viewport.width * outputScale);
+  canvas.height = Math.floor(viewport.height * outputScale);
+  canvas.style.width = `${viewport.width}px`;
+  canvas.style.height = `${viewport.height}px`;
+
+  const textLayerTask = new TextLayer({
+    textContentSource: page.streamTextContent({
+      includeMarkedContent: true,
+      disableNormalization: true,
+    }),
+    container: textLayer,
+    viewport,
+  });
+
+  await Promise.all([
+    page.render({
+      canvasContext: context,
+      viewport,
+      transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0],
+    }).promise,
+    textLayerTask.render(),
+  ]);
+
+  if (generation !== renderGeneration) {
+    page.cleanup();
+    return;
   }
 
-  const generation = renderGeneration;
-  let promise;
-  promise = (async () => {
-    const page = await pdfDocument.getPage(pageNumber);
-    const container = pageElements[pageNumber - 1];
-    const baseViewport = page.getViewport({ scale: 1, rotation });
-    const cssWidth = Math.max(280, container.clientWidth);
-    const viewport = page.getViewport({ scale: cssWidth / baseViewport.width, rotation });
-    const outputScale = Math.min(window.devicePixelRatio || 1, 2);
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d", { alpha: false });
-    const textLayer = document.createElement("div");
-    textLayer.className = "text-layer";
+  container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
+  highlightTextLayer(textLayer, completedSearchQuery);
+  container.replaceChildren(canvas, textLayer);
+  container.classList.add("rendered");
+  renderedPages.add(pageNumber);
+  page.cleanup();
+}
 
-    canvas.width = Math.floor(viewport.width * outputScale);
-    canvas.height = Math.floor(viewport.height * outputScale);
-    canvas.style.width = `${viewport.width}px`;
-    canvas.style.height = `${viewport.height}px`;
+function drainRenderQueue() {
+  if (renderQueuePromise) {
+    return renderQueuePromise;
+  }
 
-    const textLayerTask = new TextLayer({
-      textContentSource: page.streamTextContent({
-        includeMarkedContent: true,
-        disableNormalization: true,
-      }),
-      container: textLayer,
-      viewport,
-    });
-
-    await Promise.all([
-      page.render({
-        canvasContext: context,
-        viewport,
-        transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0],
-      }).promise,
-      textLayerTask.render(),
-    ]);
-
-    if (generation !== renderGeneration) {
-      page.cleanup();
-      return;
+  renderQueuePromise = (async () => {
+    try {
+      let pageNumber = takeNextQueuedPage();
+      while (pageNumber !== undefined) {
+        await renderPageNow(pageNumber);
+        await yieldToBrowser();
+        pageNumber = takeNextQueuedPage();
+      }
+    } finally {
+      renderQueuePromise = undefined;
+      if (priorityRenderQueue.size > 0 || backgroundRenderQueue.size > 0) {
+        void drainRenderQueue();
+      }
     }
-
-    container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
-    highlightTextLayer(textLayer, completedSearchQuery);
-    container.replaceChildren(canvas, textLayer);
-    container.classList.add("rendered");
-    renderedPages.add(pageNumber);
-    page.cleanup();
   })();
 
-  renderPromises.set(pageNumber, promise);
+  return renderQueuePromise;
+}
 
-  try {
-    await promise;
-  } finally {
-    if (renderPromises.get(pageNumber) === promise) {
-      renderPromises.delete(pageNumber);
+function queuePageRender(pageNumber, priority = false) {
+  if (!pdfDocument || renderedPages.has(pageNumber)) {
+    return Promise.resolve();
+  }
+
+  backgroundRenderQueue.delete(pageNumber);
+  if (priority) {
+    priorityRenderQueue.add(pageNumber);
+  } else if (!priorityRenderQueue.has(pageNumber)) {
+    backgroundRenderQueue.add(pageNumber);
+  }
+
+  return drainRenderQueue();
+}
+
+function queueAllPages() {
+  for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+    if (!renderedPages.has(pageNumber) && !priorityRenderQueue.has(pageNumber)) {
+      backgroundRenderQueue.add(pageNumber);
     }
   }
+
+  return drainRenderQueue();
 }
 
 function createPagePlaceholders(sampleViewport) {
@@ -432,25 +489,6 @@ function createPagePlaceholders(sampleViewport) {
 
   status.remove();
   viewer.append(fragment);
-}
-
-function observePages() {
-  const renderObserver = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          const pageNumber = Number.parseInt(entry.target.dataset.page, 10);
-          void renderPage(pageNumber);
-          renderObserver.unobserve(entry.target);
-        }
-      }
-    },
-    { rootMargin: "1200px 0px" },
-  );
-
-  for (const page of pageElements) {
-    renderObserver.observe(page);
-  }
 }
 
 function normalizeSearchText(value) {
@@ -504,7 +542,7 @@ function showSearchMatch(index, behavior = "smooth") {
   pageElement?.classList.add("search-match-page");
 
   goToPage(match.pageNumber, behavior);
-  void renderPage(match.pageNumber).then(() => refreshSearchHighlights());
+  void queuePageRender(match.pageNumber, true).then(() => refreshSearchHighlights());
 }
 
 async function runSearch(rawQuery) {
@@ -612,23 +650,12 @@ async function rotatePages(delta) {
 
   rotation = (rotation + delta + 360) % 360;
   renderGeneration += 1;
-
-  const pagesToRender = new Set([
-    ...renderedPages,
-    ...renderPromises.keys(),
-    currentPage,
-  ]);
-
   renderedPages.clear();
-  renderPromises.clear();
+  priorityRenderQueue.clear();
+  backgroundRenderQueue.clear();
 
-  for (const pageNumber of pagesToRender) {
-    const container = pageElements[pageNumber - 1];
-    container?.replaceChildren();
-    container?.classList.remove("rendered");
-  }
-
-  await Promise.all([...pagesToRender].map((pageNumber) => renderPage(pageNumber)));
+  await queuePageRender(currentPage, true);
+  void queueAllPages();
   pageElements[currentPage - 1]?.scrollIntoView({ behavior: "auto", block: "center" });
 }
 
@@ -650,9 +677,7 @@ async function printPdf() {
 
   setToolsMenuOpen(false);
   showToast("Preparing pages for print…");
-  await Promise.all(
-    Array.from({ length: pdfDocument.numPages }, (_, index) => renderPage(index + 1)),
-  );
+  await queueAllPages();
   window.print();
 }
 
@@ -825,10 +850,9 @@ async function initialize() {
   createPagePlaceholders(samplePage.getViewport({ scale: 1 }));
   samplePage.cleanup();
   bindControls();
-  observePages();
   await initializeSectionNavigation();
   goToPage(currentPage, "auto");
-  void renderPage(currentPage);
+  void queueAllPages();
 }
 
 initialize().catch(async (error) => {
