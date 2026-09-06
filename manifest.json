@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "PDF Viewer",
+  "name": "✨",
   "version": "0.1.0",
   "description": "Dark-mode PDF viewer with shareable current-page links.",
   "permissions": ["tabs", "webRequest", "clipboardWrite", "storage"],
