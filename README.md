@@ -1,16 +1,18 @@
 # PDF Viewer
 
-A Chrome Manifest V3 extension that replaces the normal PDF tab with a local dark-mode PDF.js viewer and makes the current page shareable.
+A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF.js viewer and makes the current page shareable.
 
 ## Features
 
 - Automatically opens URLs ending in `.pdf` in the extension viewer.
 - Also detects main-frame responses with `Content-Type: application/pdf`, so PDF endpoints do not need a `.pdf` suffix.
-- Renders PDFs locally with bundled PDF.js assets; no remotely hosted code is used.
-- Applies a dark-mode transform to rendered PDF pages.
+- Renders PDFs locally with bundled PDF.js assets; no remotely hosted executable code is used.
+- Supports dark and light viewing modes, remembers the selected theme, and shows Celestia in dark mode and Luna in light mode.
 - Tracks the page currently centered in the viewport.
-- **Share page** shares the original document URL as `#page=<current page>`; when the Web Share API is unavailable, the link is copied to the clipboard.
+- Copies the original document URL as `#page=<current page>` silently when the mark is clicked.
 - Honors an existing `#page=N` fragment when opening a document.
+- Places Download beside the page-link icon and keeps rotate left/right and print in the **More tools** menu.
+- Keeps the More tools menu open across repeated rotate actions.
 - Lazy-renders nearby pages so long filings do not render every page up front.
 
 ## Load directly in Chrome
@@ -42,10 +44,10 @@ The standalone unpacked extension is written to `dist/`. You can also select `di
 
 ## Usage
 
-Open a PDF normally. The extension redirects the tab to its own viewer while retaining the original document URL internally. Scroll to a page and click **Share page** to share or copy a link such as:
+Open a PDF normally. The extension redirects the tab to its own viewer while retaining the original document URL internally. Scroll to a page and click the page-link icon to copy a link such as:
 
 ```text
 https://example.com/document.pdf#page=42
 ```
 
-The toolbar also supports previous/next page navigation, direct page entry, and left/right arrow keys.
+The toolbar also supports previous/next page navigation, direct page entry, theme switching, page-link copying, download, and a compact More tools menu for rotate and print.

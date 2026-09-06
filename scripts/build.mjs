@@ -8,6 +8,10 @@ await mkdir(outdir, { recursive: true });
 
 const manifest = JSON.parse(await readFile("manifest.json", "utf8"));
 manifest.background.service_worker = "background.js";
+manifest.icons = Object.fromEntries(
+  Object.entries(manifest.icons).map(([size, icon]) => [size, icon.replace("src/", "")]),
+);
+manifest.action.default_icon = manifest.action.default_icon.replace("src/", "");
 
 await Promise.all([
   build({
@@ -23,6 +27,7 @@ await Promise.all([
   cp("src/background.js", `${outdir}/background.js`),
   cp("src/viewer.html", `${outdir}/viewer.html`),
   cp("src/viewer.css", `${outdir}/viewer.css`),
+  cp("src/assets", `${outdir}/assets`, { recursive: true }),
   cp("node_modules/pdfjs-dist/build/pdf.worker.min.mjs", `${outdir}/pdf.worker.min.mjs`),
   cp("node_modules/pdfjs-dist/cmaps", `${outdir}/cmaps`, { recursive: true }),
   cp("node_modules/pdfjs-dist/standard_fonts", `${outdir}/standard_fonts`, { recursive: true }),
