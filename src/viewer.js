@@ -131,7 +131,28 @@ function goToPage(pageNumber, behavior = "smooth") {
   const nextPage = Math.min(Math.max(pageNumber, 1), pdfDocument.numPages);
   setCurrentPage(nextPage);
   void queuePageRender(nextPage, true);
-  pageElements[nextPage - 1]?.scrollIntoView({ behavior, block: "center" });
+  const scrollBehavior = behavior === "auto" ? "instant" : behavior;
+
+  const pageElement = pageElements[nextPage - 1];
+  if (!pageElement) {
+    return;
+  }
+
+  const toolbarHeight = 52;
+  const pageGap = 24;
+  const readableHeight = window.innerHeight - toolbarHeight - pageGap * 2;
+  const pageRect = pageElement.getBoundingClientRect();
+
+  if (pageRect.height <= readableHeight) {
+    pageElement.scrollIntoView({ behavior: scrollBehavior, block: "center" });
+    return;
+  }
+
+  const pageTop = window.scrollY + pageRect.top;
+  window.scrollTo({
+    top: Math.max(0, pageTop - toolbarHeight - pageGap),
+    behavior: scrollBehavior,
+  });
 }
 
 function showToast(message) {
