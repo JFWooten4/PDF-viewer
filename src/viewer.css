@@ -35,6 +35,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -128,6 +132,93 @@ input {
 .mark-button:disabled {
   cursor: default;
   opacity: 0.45;
+}
+
+.section-nav {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.section-toggle {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px;
+  line-height: 1;
+}
+
+.section-popover {
+  position: absolute;
+  top: calc(100% + 9px);
+  left: 0;
+  width: min(360px, calc(100vw - 24px));
+  max-height: calc(100vh - 76px);
+  overflow: auto;
+  border: 1px solid #36363a;
+  border-radius: 10px;
+  background: #18181b;
+  box-shadow: 0 16px 44px rgb(0 0 0 / 42%);
+}
+
+.section-popover-title {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 11px 13px 9px;
+  border-bottom: 1px solid #2d2d31;
+  background: #18181b;
+  color: #a9a9af;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.section-list,
+.section-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.section-list > ul {
+  padding: 6px;
+}
+
+.section-list ul ul {
+  padding-left: 14px;
+}
+
+.section-entry {
+  min-width: 0;
+}
+
+.section-link,
+.section-heading {
+  display: block;
+  width: 100%;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #e7e7ea;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.section-link {
+  cursor: pointer;
+}
+
+.section-link:hover,
+.section-link:focus-visible {
+  outline: 0;
+  background: #29292d;
+}
+
+.section-heading {
+  color: #9d9da3;
+  font-weight: 600;
 }
 
 .page-control {

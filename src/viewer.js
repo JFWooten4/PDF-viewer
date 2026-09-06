@@ -18,6 +18,11 @@ const nextButton = document.querySelector("#next-page");
 const pageNumberInput = document.querySelector("#page-number");
 const pageCount = document.querySelector("#page-count");
 const shareButton = document.querySelector("#share-page");
+const shareIcon = document.querySelector("#share-icon");
+const sectionNav = document.querySelector("#section-nav");
+const sectionToggle = document.querySelector("#section-toggle");
+const sectionPopover = document.querySelector("#section-popover");
+const sectionList = document.querySelector("#section-list");
 const themeButton = document.querySelector("#theme-toggle");
 const themeIcon = document.querySelector("#theme-icon");
 const tools = document.querySelector("#tools");
@@ -34,6 +39,14 @@ const source = params.get("url");
 const THEME_STORAGE_KEY = "pdf-viewer-theme";
 const LUNA_ICON = extensionAssetUrl("src/assets/luna-mark.png", "assets/luna-mark.png");
 const CELESTIA_ICON = extensionAssetUrl("src/assets/celestia-mark.png", "assets/celestia-mark.png");
+const DARK_MODE_SHARE_ICON = extensionAssetUrl(
+  "src/assets/copy-page-icon.png",
+  "assets/copy-page-icon.png",
+);
+const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
+  "src/assets/copy-page-icon-light.png",
+  "assets/copy-page-icon-light.png",
+);
 
 let pdfDocument;
 let originalUrl;
@@ -111,6 +124,113 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("visible"), 1800);
 }
 
+function outlineHasDestination(items) {
+  return items.some(
+    (item) => Boolean(item.dest) || (item.items?.length && outlineHasDestination(item.items)),
+  );
+}
+
+function closeSectionPopover() {
+  sectionPopover.hidden = true;
+  sectionToggle.setAttribute("aria-expanded", "false");
+}
+
+function toggleSectionPopover() {
+  const opening = sectionPopover.hidden;
+  sectionPopover.hidden = !opening;
+  sectionToggle.setAttribute("aria-expanded", String(opening));
+}
+
+async function navigateToOutlineItem(item) {
+  try {
+    let destination = item.dest;
+
+    if (typeof destination === "string") {
+      destination = await pdfDocument.getDestination(destination);
+    }
+
+    if (!Array.isArray(destination) || destination.length === 0) {
+      return;
+    }
+
+    const pageReference = destination[0];
+    let pageIndex;
+
+    if (Number.isInteger(pageReference)) {
+      pageIndex = pageReference;
+    } else {
+      pageIndex = await pdfDocument.getPageIndex(pageReference);
+    }
+
+    goToPage(pageIndex + 1);
+    closeSectionPopover();
+  } catch {
+    showToast("Could not open that section");
+  }
+}
+
+function createOutlineList(items) {
+  const list = document.createElement("ul");
+
+  for (const item of items) {
+    const children = item.items || [];
+    const hasDestination = Boolean(item.dest);
+    const hasChildDestination = children.length > 0 && outlineHasDestination(children);
+    const title = item.title?.trim();
+
+    if (!title || (!hasDestination && !hasChildDestination)) {
+      continue;
+    }
+
+    const entry = document.createElement("li");
+    entry.className = "section-entry";
+
+    if (hasDestination) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "section-link";
+      button.textContent = title;
+      button.addEventListener("click", () => void navigateToOutlineItem(item));
+      entry.append(button);
+    } else {
+      const heading = document.createElement("span");
+      heading.className = "section-heading";
+      heading.textContent = title;
+      entry.append(heading);
+    }
+
+    if (hasChildDestination) {
+      entry.append(createOutlineList(children));
+    }
+
+    list.append(entry);
+  }
+
+  return list;
+}
+
+async function initializeSectionNavigation() {
+  let outline;
+
+  try {
+    outline = await pdfDocument.getOutline();
+  } catch {
+    return;
+  }
+
+  if (!outline?.length || !outlineHasDestination(outline)) {
+    return;
+  }
+
+  const outlineList = createOutlineList(outline);
+  if (!outlineList.childElementCount) {
+    return;
+  }
+
+  sectionList.replaceChildren(outlineList);
+  sectionNav.hidden = false;
+}
+
 function setToolsMenuOpen(open) {
   toolsMenu.hidden = !open;
   toolsButton.setAttribute("aria-expanded", String(open));
@@ -124,6 +244,7 @@ function setTheme(theme) {
   const isDark = nextTheme === "dark";
   themeIcon.classList.toggle("celestia-icon", isDark);
   themeIcon.src = isDark ? CELESTIA_ICON : LUNA_ICON;
+  shareIcon.src = isDark ? DARK_MODE_SHARE_ICON : LIGHT_MODE_SHARE_ICON;
   themeButton.title = isDark ? "Switch to light mode" : "Switch to dark mode";
   themeButton.setAttribute("aria-label", themeButton.title);
 }
@@ -299,6 +420,13 @@ function bindControls() {
   previousButton.addEventListener("click", () => goToPage(currentPage - 1));
   nextButton.addEventListener("click", () => goToPage(currentPage + 1));
   shareButton.addEventListener("click", () => void shareCurrentPage());
+  sectionToggle.addEventListener("click", toggleSectionPopover);
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!sectionPopover.hidden && !sectionNav.contains(event.target)) {
+      closeSectionPopover();
+    }
+  });
   themeButton.addEventListener("click", toggleTheme);
   toolsButton.addEventListener("click", () => {
     setToolsMenuOpen(toolsMenu.hidden);
@@ -332,7 +460,13 @@ function bindControls() {
       return;
     }
 
-    if (document.activeElement === pageNumberInput) {
+    if (event.key === "Escape" && !sectionPopover.hidden) {
+      closeSectionPopover();
+      sectionToggle.focus();
+      return;
+    }
+
+    if (document.activeElement === pageNumberInput || sectionPopover.contains(document.activeElement)) {
       return;
     }
 
@@ -387,6 +521,7 @@ async function initialize() {
   samplePage.cleanup();
   bindControls();
   observePages();
+  await initializeSectionNavigation();
   goToPage(currentPage, "auto");
   void renderPage(currentPage);
 }

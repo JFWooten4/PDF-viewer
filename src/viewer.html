@@ -8,6 +8,21 @@
   </head>
   <body>
     <header class="toolbar" aria-label="PDF controls">
+      <div id="section-nav" class="section-nav" hidden>
+        <button
+          id="section-toggle"
+          class="mark-button section-toggle"
+          type="button"
+          aria-label="Document sections"
+          aria-controls="section-popover"
+          aria-expanded="false"
+          title="Document sections"
+        >§</button>
+        <div id="section-popover" class="section-popover" hidden>
+          <div class="section-popover-title">Sections</div>
+          <nav id="section-list" class="section-list" aria-label="Document sections"></nav>
+        </div>
+      </div>
       <button id="previous-page" class="icon-button" type="button" aria-label="Previous page" title="Previous page">←</button>
       <label class="page-control" aria-label="Current page">
         <input id="page-number" type="number" min="1" value="1" inputmode="numeric" />
@@ -19,7 +34,7 @@
         <img id="theme-icon" alt="" aria-hidden="true" />
       </button>
       <button id="share-page" class="mark-button" type="button" aria-label="Copy page link" title="Copy page link">
-        <img src="assets/copy-page-icon.png" alt="" aria-hidden="true" />
+        <img id="share-icon" alt="" aria-hidden="true" />
       </button>
       <button id="download-pdf" class="mark-button" type="button" aria-label="Download PDF" title="Download PDF">
         <img src="assets/download-icon.png" alt="" aria-hidden="true" />
