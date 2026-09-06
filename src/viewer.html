@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PDF Viewer</title>
     <link rel="stylesheet" href="viewer.css" />
+    <link rel="stylesheet" href="image-color-toggle.css" />
   </head>
   <body>
     <header class="toolbar" aria-label="PDF controls">
@@ -60,6 +61,12 @@
           <button id="rotate-right" class="tool-button" type="button" role="menuitem">↷ <span>Rotate right</span></button>
           <div class="menu-separator" role="separator"></div>
           <button id="print-pdf" class="tool-button" type="button" role="menuitem">⎙ <span>Print</span></button>
+          <div class="menu-separator" role="separator"></div>
+          <label class="tool-toggle" title="Keep embedded PDF images in their original colors in dark mode">
+            <span>Preserve image colors</span>
+            <input id="preserve-image-colors" class="toggle-input" type="checkbox" checked />
+            <span class="toggle-switch" aria-hidden="true"></span>
+          </label>
         </div>
       </div>
     </header>
@@ -70,6 +77,7 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+    <script type="module" src="image-color-toggle.js"></script>
     <script type="module" src="viewer.js"></script>
     <script type="module" src="viewer-settings.js"></script>
     <script type="module" src="close-tab-shortcut.js"></script>
