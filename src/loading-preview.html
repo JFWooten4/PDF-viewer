@@ -14,6 +14,19 @@
         <span>/ <span>—</span></span>
       </label>
       <button class="icon-button" type="button" aria-label="Next page" title="Next page">→</button>
+      <div class="search-control" role="search" aria-label="Search PDF">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input
+          type="search"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Search"
+          aria-label="Search document"
+        />
+        <span class="search-count" aria-live="polite"></span>
+        <button class="search-nav-button" type="button" aria-label="Previous search result" title="Previous result" disabled>↑</button>
+        <button class="search-nav-button" type="button" aria-label="Next search result" title="Next result" disabled>↓</button>
+      </div>
       <div class="spacer"></div>
       <button class="mark-button theme-button" type="button" aria-label="Switch to light mode" title="Switch to light mode">
         <img class="celestia-icon" src="assets/celestia-mark.png" alt="" aria-hidden="true" />
@@ -25,7 +38,7 @@
         <img src="assets/download-icon.png" alt="" aria-hidden="true" />
       </button>
       <div class="tools">
-        <button class="icon-button" type="button" aria-label="More PDF tools" title="More PDF tools">⋯</button>
+        <button class="mark-button tools-toggle" type="button" aria-label="More PDF tools" title="More PDF tools">⋯</button>
       </div>
     </header>
 
