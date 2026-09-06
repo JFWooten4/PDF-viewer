@@ -1,10 +1,13 @@
 import { build } from "esbuild";
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 
 const outdir = "dist";
 
 await rm(outdir, { recursive: true, force: true });
 await mkdir(outdir, { recursive: true });
+
+const manifest = JSON.parse(await readFile("manifest.json", "utf8"));
+manifest.background.service_worker = "background.js";
 
 await Promise.all([
   build({
@@ -16,7 +19,7 @@ await Promise.all([
     minify: false,
     sourcemap: false,
   }),
-  cp("manifest.json", `${outdir}/manifest.json`),
+  writeFile(`${outdir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`),
   cp("src/background.js", `${outdir}/background.js`),
   cp("src/viewer.html", `${outdir}/viewer.html`),
   cp("src/viewer.css", `${outdir}/viewer.css`),
