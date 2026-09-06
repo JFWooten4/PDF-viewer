@@ -3,11 +3,18 @@
   "name": "PDF Viewer",
   "version": "0.1.0",
   "description": "Dark-mode PDF viewer with shareable current-page links.",
-  "permissions": ["tabs", "webRequest", "clipboardWrite"],
+  "permissions": ["tabs", "webRequest", "clipboardWrite", "storage"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "src/background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["https://www.sec.gov/comments/*"],
+      "js": ["src/sec-comment.js"],
+      "run_at": "document_start"
+    }
+  ],
   "icons": {
     "16": "src/assets/luna-mark.png",
     "32": "src/assets/luna-mark.png",
