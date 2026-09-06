@@ -47,6 +47,8 @@ const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
   "src/assets/copy-page-icon-light.png",
   "assets/copy-page-icon-light.png",
 );
+const SCANNED_PAGE_IMAGE_AREA_THRESHOLD = 0.8;
+const SVG_NS = "http://www.w3.org/2000/svg";
 
 let pdfDocument;
 let originalUrl;
@@ -60,6 +62,91 @@ let toastTimer;
 let renderGeneration = 0;
 const renderPromises = new Map();
 const renderedPages = new Set();
+
+function imageAreaFraction(imageCoordinates, offset) {
+  const topLeftX = imageCoordinates[offset];
+  const topLeftY = imageCoordinates[offset + 1];
+  const bottomLeftX = imageCoordinates[offset + 2];
+  const bottomLeftY = imageCoordinates[offset + 3];
+  const topRightX = imageCoordinates[offset + 4];
+  const topRightY = imageCoordinates[offset + 5];
+  const leftX = bottomLeftX - topLeftX;
+  const leftY = bottomLeftY - topLeftY;
+  const topX = topRightX - topLeftX;
+  const topY = topRightY - topLeftY;
+
+  return Math.abs(leftX * topY - leftY * topX);
+}
+
+function hasPageSizedImage(imageCoordinates) {
+  for (let offset = 0; offset + 5 < imageCoordinates.length; offset += 6) {
+    if (imageAreaFraction(imageCoordinates, offset) >= SCANNED_PAGE_IMAGE_AREA_THRESHOLD) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function clampUnit(value) {
+  return Math.min(1, Math.max(0, value));
+}
+
+function createImageClipDefinition(imageCoordinates, pageNumber, generation) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  const definitions = document.createElementNS(SVG_NS, "defs");
+  const clipPath = document.createElementNS(SVG_NS, "clipPath");
+  const clipId = `pdf-image-clip-${pageNumber}-${generation}`;
+
+  svg.setAttribute("aria-hidden", "true");
+  svg.style.position = "absolute";
+  svg.style.width = "0";
+  svg.style.height = "0";
+  svg.style.pointerEvents = "none";
+  clipPath.id = clipId;
+  clipPath.setAttribute("clipPathUnits", "objectBoundingBox");
+
+  for (let offset = 0; offset + 5 < imageCoordinates.length; offset += 6) {
+    const topLeftX = clampUnit(imageCoordinates[offset]);
+    const topLeftY = clampUnit(imageCoordinates[offset + 1]);
+    const bottomLeftX = clampUnit(imageCoordinates[offset + 2]);
+    const bottomLeftY = clampUnit(imageCoordinates[offset + 3]);
+    const topRightX = clampUnit(imageCoordinates[offset + 4]);
+    const topRightY = clampUnit(imageCoordinates[offset + 5]);
+    const bottomRightX = clampUnit(bottomLeftX + topRightX - topLeftX);
+    const bottomRightY = clampUnit(bottomLeftY + topRightY - topLeftY);
+    const polygon = document.createElementNS(SVG_NS, "polygon");
+
+    polygon.setAttribute(
+      "points",
+      `${topLeftX},${topLeftY} ${bottomLeftX},${bottomLeftY} ${bottomRightX},${bottomRightY} ${topRightX},${topRightY}`,
+    );
+    clipPath.append(polygon);
+  }
+
+  definitions.append(clipPath);
+  svg.append(definitions);
+  return { svg, clipId };
+}
+
+function createImageOverlayCanvas(baseCanvas, viewport, clipId) {
+  const overlay = document.createElement("canvas");
+  overlay.className = "page-image-overlay";
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.width = baseCanvas.width;
+  overlay.height = baseCanvas.height;
+  overlay.style.width = `${viewport.width}px`;
+  overlay.style.height = `${viewport.height}px`;
+  overlay.style.position = "absolute";
+  overlay.style.inset = "0";
+  overlay.style.zIndex = "1";
+  overlay.style.pointerEvents = "none";
+  overlay.style.filter = "none";
+  overlay.style.clipPath = `url(#${clipId})`;
+  overlay.style.webkitClipPath = `url(#${clipId})`;
+  overlay.style.display = document.documentElement.dataset.theme === "dark" ? "block" : "none";
+  return overlay;
+}
 
 function getInitialPage(url) {
   const match = url.hash.match(/(?:^#|[&#])page=(\d+)/i);
@@ -247,6 +334,10 @@ function setTheme(theme) {
   shareIcon.src = isDark ? DARK_MODE_SHARE_ICON : LIGHT_MODE_SHARE_ICON;
   themeButton.title = isDark ? "Switch to light mode" : "Switch to dark mode";
   themeButton.setAttribute("aria-label", themeButton.title);
+
+  for (const overlay of document.querySelectorAll(".page-image-overlay")) {
+    overlay.style.display = isDark ? "block" : "none";
+  }
 }
 
 function toggleTheme() {
@@ -271,6 +362,8 @@ async function renderPage(pageNumber) {
     const cssWidth = Math.max(280, container.clientWidth);
     const viewport = page.getViewport({ scale: cssWidth / baseViewport.width, rotation });
     const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+    const renderTransform =
+      outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0];
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d", { alpha: false });
 
@@ -279,11 +372,33 @@ async function renderPage(pageNumber) {
     canvas.style.width = `${viewport.width}px`;
     canvas.style.height = `${viewport.height}px`;
 
-    await page.render({
+    const renderTask = page.render({
       canvasContext: context,
       viewport,
-      transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0],
-    }).promise;
+      transform: renderTransform,
+      recordImages: true,
+    });
+    await renderTask.promise;
+
+    if (generation !== renderGeneration) {
+      page.cleanup();
+      return;
+    }
+
+    let clipDefinition;
+    let imageOverlay;
+    const imageCoordinates = renderTask.imageCoordinates;
+    if (imageCoordinates?.length && !hasPageSizedImage(imageCoordinates)) {
+      clipDefinition = createImageClipDefinition(imageCoordinates, pageNumber, generation);
+      imageOverlay = createImageOverlayCanvas(canvas, viewport, clipDefinition.clipId);
+      const imageContext = imageOverlay.getContext("2d", { alpha: false });
+
+      await page.render({
+        canvasContext: imageContext,
+        viewport,
+        transform: renderTransform,
+      }).promise;
+    }
 
     if (generation !== renderGeneration) {
       page.cleanup();
@@ -291,7 +406,10 @@ async function renderPage(pageNumber) {
     }
 
     container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
-    container.replaceChildren(canvas);
+    container.replaceChildren(
+      canvas,
+      ...(clipDefinition ? [clipDefinition.svg, imageOverlay] : []),
+    );
     container.classList.add("rendered");
     renderedPages.add(pageNumber);
     page.cleanup();
@@ -394,7 +512,15 @@ async function printPdf() {
   await Promise.all(
     Array.from({ length: pdfDocument.numPages }, (_, index) => renderPage(index + 1)),
   );
+
+  const overlays = [...document.querySelectorAll(".page-image-overlay")];
+  for (const overlay of overlays) {
+    overlay.style.display = "none";
+  }
   window.print();
+  for (const overlay of overlays) {
+    overlay.style.display = document.documentElement.dataset.theme === "dark" ? "block" : "none";
+  }
 }
 
 async function downloadPdf() {
