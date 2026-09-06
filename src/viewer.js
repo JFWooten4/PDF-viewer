@@ -130,6 +130,34 @@ function outlineHasDestination(items) {
   );
 }
 
+function sectionReferenceFromTitle(title) {
+  const match = title.match(
+    /^((?:[IVXLCDM]+|[A-Z]|\d+|[a-z])(?:\.(?:[IVXLCDM]+|[A-Z]|\d+|[a-z]))*)\.?(?=\s|$)/,
+  );
+  return match?.[1] || "";
+}
+
+function fullSectionReference(parentReference, localReference) {
+  if (!localReference) {
+    return parentReference;
+  }
+
+  if (!parentReference || localReference.includes(".")) {
+    return localReference;
+  }
+
+  return `${parentReference}.${localReference}`;
+}
+
+async function copySectionReference(reference) {
+  try {
+    await navigator.clipboard.writeText(reference);
+    showToast(`Copied ${reference}`);
+  } catch {
+    showToast("Could not copy section reference");
+  }
+}
+
 function closeSectionPopover() {
   sectionPopover.hidden = true;
   sectionToggle.setAttribute("aria-expanded", "false");
@@ -169,7 +197,7 @@ async function navigateToOutlineItem(item) {
   }
 }
 
-function createOutlineList(items) {
+function createOutlineList(items, parentReference = "") {
   const list = document.createElement("ul");
 
   for (const item of items) {
@@ -182,8 +210,12 @@ function createOutlineList(items) {
       continue;
     }
 
+    const localReference = sectionReferenceFromTitle(title);
+    const sectionReference = fullSectionReference(parentReference, localReference);
     const entry = document.createElement("li");
+    const row = document.createElement("div");
     entry.className = "section-entry";
+    row.className = "section-entry-row";
 
     if (hasDestination) {
       const button = document.createElement("button");
@@ -191,16 +223,29 @@ function createOutlineList(items) {
       button.className = "section-link";
       button.textContent = title;
       button.addEventListener("click", () => void navigateToOutlineItem(item));
-      entry.append(button);
+      row.append(button);
     } else {
       const heading = document.createElement("span");
       heading.className = "section-heading";
       heading.textContent = title;
-      entry.append(heading);
+      row.append(heading);
     }
 
+    if (localReference) {
+      const copyButton = document.createElement("button");
+      copyButton.type = "button";
+      copyButton.className = "section-copy";
+      copyButton.textContent = "⧉";
+      copyButton.title = `Copy section reference ${sectionReference}`;
+      copyButton.setAttribute("aria-label", copyButton.title);
+      copyButton.addEventListener("click", () => void copySectionReference(sectionReference));
+      row.append(copyButton);
+    }
+
+    entry.append(row);
+
     if (hasChildDestination) {
-      entry.append(createOutlineList(children));
+      entry.append(createOutlineList(children, sectionReference));
     }
 
     list.append(entry);
