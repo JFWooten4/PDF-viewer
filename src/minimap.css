@@ -1,0 +1,94 @@
+@media (min-width: 701px) {
+  html {
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .viewer {
+    padding-right: 112px;
+  }
+
+  .page {
+    width: min(1100px, calc(100vw - 128px));
+  }
+}
+
+.minimap {
+  position: fixed;
+  inset: 52px 0 0 auto;
+  z-index: 9;
+  width: 96px;
+  overflow: hidden;
+  border-left: 1px solid var(--border);
+  outline: 0;
+  background: var(--toolbar-bg);
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+
+.minimap:focus-visible {
+  box-shadow: inset 2px 0 0 var(--muted);
+}
+
+.minimap-pages {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.minimap-page {
+  position: absolute;
+  right: 8px;
+  left: 8px;
+  min-height: 1px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 1px;
+  background: var(--page-bg);
+  opacity: 0.82;
+}
+
+.minimap-page canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  filter: var(--page-filter);
+}
+
+.minimap-viewport {
+  position: absolute;
+  right: 3px;
+  left: 3px;
+  z-index: 2;
+  min-height: 18px;
+  border: 1px solid var(--muted);
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--body-bg) 36%, transparent);
+  pointer-events: none;
+}
+
+.minimap:hover .minimap-viewport,
+.minimap:focus-visible .minimap-viewport {
+  background: color-mix(in srgb, var(--text) 20%, transparent);
+}
+
+@media (max-width: 700px) {
+  .minimap {
+    display: none;
+  }
+}
+
+@media print {
+  .minimap {
+    display: none !important;
+  }
+}

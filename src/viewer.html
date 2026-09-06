@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PDF Viewer</title>
     <link rel="stylesheet" href="viewer.css" />
+    <link rel="stylesheet" href="minimap.css" />
   </head>
   <body>
     <header class="toolbar" aria-label="PDF controls">
@@ -54,8 +55,25 @@
       <div id="status" class="status">Loading PDF…</div>
     </main>
 
+    <aside
+      id="minimap"
+      class="minimap"
+      role="scrollbar"
+      aria-label="Document minimap"
+      aria-controls="viewer"
+      aria-orientation="vertical"
+      aria-valuemin="0"
+      aria-valuemax="0"
+      aria-valuenow="0"
+      tabindex="0"
+    >
+      <div id="minimap-pages" class="minimap-pages" aria-hidden="true"></div>
+      <div id="minimap-viewport" class="minimap-viewport" aria-hidden="true"></div>
+    </aside>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script type="module" src="viewer.js"></script>
+    <script type="module" src="minimap.js"></script>
   </body>
 </html>
