@@ -27,6 +27,7 @@ await Promise.all([
   cp("src/background.js", `${outdir}/background.js`),
   cp("src/viewer.html", `${outdir}/viewer.html`),
   cp("src/viewer.css", `${outdir}/viewer.css`),
+  cp("src/close-tab-shortcut.js", `${outdir}/close-tab-shortcut.js`),
   cp("src/assets", `${outdir}/assets`, { recursive: true }),
   cp("node_modules/pdfjs-dist/build/pdf.worker.min.mjs", `${outdir}/pdf.worker.min.mjs`),
   cp("node_modules/pdfjs-dist/cmaps", `${outdir}/cmaps`, { recursive: true }),
