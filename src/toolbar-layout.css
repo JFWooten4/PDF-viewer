@@ -44,3 +44,26 @@
     padding-left: 8px;
   }
 }
+
+/* Give search its own row when the navigation controls need more room. */
+@media (max-width: 1100px) {
+  .toolbar {
+    height: 100px;
+    align-items: flex-start;
+  }
+
+  .search-control {
+    top: 56px;
+    left: 8px;
+    width: calc(100% - 16px);
+    transform: none;
+  }
+
+  .minimap {
+    top: 100px;
+  }
+
+  .viewer {
+    padding-top: 124px;
+  }
+}
