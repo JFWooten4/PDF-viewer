@@ -3,6 +3,9 @@ const minimap = document.querySelector("#minimap");
 const minimapPages = document.querySelector("#minimap-pages");
 const minimapViewport = document.querySelector("#minimap-viewport");
 
+const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
+const WHEEL_LINE_HEIGHT = 16;
+
 let syncFrame;
 let dragging = false;
 let dragOffset = 0;
@@ -69,6 +72,14 @@ function documentMetrics() {
   return { documentHeight, scrollMaximum };
 }
 
+function viewportTopFromScrollPosition() {
+  const trackHeight = minimap.clientHeight;
+  const { scrollMaximum } = documentMetrics();
+  const viewportTravel = Math.max(trackHeight - viewportHeight, 0);
+  const scrollRatio = scrollMaximum > 0 ? window.scrollY / scrollMaximum : 0;
+  return clamp(scrollRatio, 0, 1) * viewportTravel;
+}
+
 function syncMinimap() {
   if (!minimap || minimap.clientHeight === 0) {
     return;
@@ -95,9 +106,7 @@ function syncMinimap() {
     trackHeight,
     Math.max(18, (window.innerHeight / documentHeight) * trackHeight),
   );
-  const viewportTravel = Math.max(trackHeight - viewportHeight, 0);
-  const scrollRatio = scrollMaximum > 0 ? window.scrollY / scrollMaximum : 0;
-  const viewportTop = clamp(scrollRatio, 0, 1) * viewportTravel;
+  const viewportTop = viewportTopFromScrollPosition();
 
   minimapViewport.style.top = `${viewportTop}px`;
   minimapViewport.style.height = `${viewportHeight}px`;
@@ -111,6 +120,18 @@ function scrollFromViewportTop(viewportTop) {
   const viewportTravel = Math.max(trackHeight - viewportHeight, 0);
   const ratio = viewportTravel > 0 ? clamp(viewportTop / viewportTravel, 0, 1) : 0;
   window.scrollTo({ top: ratio * scrollMaximum, behavior: "auto" });
+}
+
+function normalizedWheelDelta(event) {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    return event.deltaY * WHEEL_LINE_HEIGHT;
+  }
+
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    return event.deltaY * minimap.clientHeight;
+  }
+
+  return event.deltaY;
 }
 
 function pointerPosition(event) {
@@ -155,6 +176,21 @@ function endDrag(event) {
 
 minimap.addEventListener("pointerup", endDrag);
 minimap.addEventListener("pointercancel", endDrag);
+
+minimap.addEventListener(
+  "wheel",
+  (event) => {
+    const delta = normalizedWheelDelta(event);
+    if (!delta) {
+      return;
+    }
+
+    const viewportTop = viewportTopFromScrollPosition();
+    scrollFromViewportTop(viewportTop + delta * MINIMAP_WHEEL_TRACK_SCALE);
+    event.preventDefault();
+  },
+  { passive: false },
+);
 
 minimap.addEventListener("keydown", (event) => {
   const pageStep = Math.max(window.innerHeight - 80, 120);

@@ -1,0 +1,99 @@
+.qr-file-url-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #101114;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 55%);
+}
+
+.qr-file-url-dialog::backdrop {
+  background: rgb(0 0 0 / 78%);
+  backdrop-filter: blur(5px);
+}
+
+.qr-file-url-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 30px 30px 26px;
+  text-align: center;
+}
+
+.qr-file-url-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f0f1f3;
+  color: #151619;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.qr-file-url-close:hover,
+.qr-file-url-close:focus-visible {
+  outline: 0;
+  background: #dedfe3;
+}
+
+.qr-file-url-card h2 {
+  margin: 2px 44px 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.qr-file-url-help {
+  margin: 0;
+  color: #5d6068;
+  font-size: 14px;
+}
+
+.qr-file-url-graphic {
+  display: grid;
+  place-items: center;
+  width: min(420px, calc(100vw - 92px));
+  aspect-ratio: 1;
+  margin-top: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.qr-file-url-graphic svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: #000000;
+  shape-rendering: crispEdges;
+}
+
+.qr-file-url-text {
+  width: 100%;
+  margin: 0;
+  color: #686b73;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .qr-file-url-card {
+    padding: 26px 18px 22px;
+  }
+
+  .qr-file-url-graphic {
+    width: min(390px, calc(100vw - 68px));
+  }
+}
