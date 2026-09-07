@@ -6,6 +6,7 @@
     <title>PDF Viewer</title>
     <link rel="stylesheet" href="viewer.css" />
     <link rel="stylesheet" href="minimap.css" />
+    <link rel="stylesheet" href="image-color-toggle.css" />
   </head>
   <body>
     <header class="toolbar" aria-label="PDF controls">
@@ -30,6 +31,20 @@
         <span>/ <span id="page-count">—</span></span>
       </label>
       <button id="next-page" class="icon-button" type="button" aria-label="Next page" title="Next page">→</button>
+      <div class="search-control" role="search" aria-label="Search PDF">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input
+          id="search-input"
+          type="search"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Search"
+          aria-label="Search document"
+        />
+        <span id="search-count" class="search-count" aria-live="polite"></span>
+        <button id="search-previous" class="search-nav-button" type="button" aria-label="Previous search result" title="Previous result" disabled>↑</button>
+        <button id="search-next" class="search-nav-button" type="button" aria-label="Next search result" title="Next result" disabled>↓</button>
+      </div>
       <div class="spacer"></div>
       <button id="theme-toggle" class="mark-button theme-button" type="button" aria-label="Switch theme" title="Switch theme">
         <img id="theme-icon" alt="" aria-hidden="true" />
@@ -37,16 +52,23 @@
       <button id="share-page" class="mark-button" type="button" aria-label="Copy page link" title="Copy page link">
         <img id="share-icon" alt="" aria-hidden="true" />
       </button>
+      <button id="copy-file-url" class="mark-button" type="button" aria-label="Copy file URL" title="Copy file URL">⧉</button>
       <button id="download-pdf" class="mark-button" type="button" aria-label="Download PDF" title="Download PDF">
         <img src="assets/download-icon.png" alt="" aria-hidden="true" />
       </button>
       <div id="tools" class="tools">
-        <button id="tools-button" class="icon-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" aria-label="More PDF tools" title="More PDF tools">⋯</button>
+        <button id="tools-button" class="mark-button tools-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" aria-label="More PDF tools" title="More PDF tools">⋯</button>
         <div id="tools-menu" class="tools-menu" role="menu" hidden>
           <button id="rotate-left" class="tool-button" type="button" role="menuitem">↶ <span>Rotate left</span></button>
           <button id="rotate-right" class="tool-button" type="button" role="menuitem">↷ <span>Rotate right</span></button>
           <div class="menu-separator" role="separator"></div>
           <button id="print-pdf" class="tool-button" type="button" role="menuitem">⎙ <span>Print</span></button>
+          <div class="menu-separator" role="separator"></div>
+          <label class="tool-toggle" title="Keep embedded PDF images in their original colors in dark mode">
+            <span>Preserve image colors</span>
+            <input id="preserve-image-colors" class="toggle-input" type="checkbox" checked />
+            <span class="toggle-switch" aria-hidden="true"></span>
+          </label>
         </div>
       </div>
     </header>
@@ -73,7 +95,11 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+    <script type="module" src="image-color-toggle.js"></script>
     <script type="module" src="viewer.js"></script>
     <script type="module" src="minimap.js"></script>
+    <script type="module" src="copy-file-url.js"></script>
+    <script type="module" src="viewer-settings.js"></script>
+    <script type="module" src="close-tab-shortcut.js"></script>
   </body>
 </html>
