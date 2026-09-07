@@ -510,7 +510,7 @@ input {
   text-size-adjust: none;
   transform-origin: 0 0;
   forced-color-adjust: none;
-  pointer-events: none;
+  cursor: text;
   --min-font-size: 1;
   --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
   --min-font-size-inv: calc(1 / var(--min-font-size));
@@ -532,6 +532,14 @@ input {
 
 .text-layer .markedContent {
   display: contents;
+}
+
+.text-layer ::selection {
+  background: rgb(77 154 255 / 45%);
+}
+
+.text-layer br::selection {
+  background: transparent;
 }
 
 .text-layer .search-highlight {

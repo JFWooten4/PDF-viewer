@@ -3,6 +3,9 @@ const minimap = document.querySelector("#minimap");
 const minimapPages = document.querySelector("#minimap-pages");
 const minimapViewport = document.querySelector("#minimap-viewport");
 
+const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
+const WHEEL_LINE_HEIGHT = 16;
+
 let syncFrame;
 let dragging = false;
 let dragOffset = 0;
@@ -70,6 +73,13 @@ function documentMetrics() {
   return { documentHeight, scrollMaximum };
 }
 
+function viewportTopFromScrollPosition() {
+  const { scrollMaximum } = documentMetrics();
+  const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
+  const scrollRatio = scrollMaximum > 0 ? window.scrollY / scrollMaximum : 0;
+  return clamp(scrollRatio, 0, 1) * viewportTravel;
+}
+
 function syncMinimap() {
   if (!minimap || minimap.clientHeight === 0) {
     return;
@@ -121,6 +131,18 @@ function scrollFromViewportTop(viewportTop) {
   window.scrollTo({ top: ratio * scrollMaximum, behavior: "auto" });
 }
 
+function normalizedWheelDelta(event) {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    return event.deltaY * WHEEL_LINE_HEIGHT;
+  }
+
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    return event.deltaY * minimap.clientHeight;
+  }
+
+  return event.deltaY;
+}
+
 function pointerPosition(event) {
   const rect = minimap.getBoundingClientRect();
   return clamp(event.clientY - rect.top, 0, rect.height);
@@ -163,6 +185,21 @@ function endDrag(event) {
 
 minimap.addEventListener("pointerup", endDrag);
 minimap.addEventListener("pointercancel", endDrag);
+
+minimap.addEventListener(
+  "wheel",
+  (event) => {
+    const delta = normalizedWheelDelta(event);
+    if (!delta) {
+      return;
+    }
+
+    const viewportTop = viewportTopFromScrollPosition();
+    scrollFromViewportTop(viewportTop + delta * MINIMAP_WHEEL_TRACK_SCALE);
+    event.preventDefault();
+  },
+  { passive: false },
+);
 
 minimap.addEventListener("keydown", (event) => {
   const pageStep = Math.max(window.innerHeight - 80, 120);
