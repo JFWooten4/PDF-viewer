@@ -1,0 +1,29 @@
+.text-layer {
+  letter-spacing: normal;
+  word-spacing: normal;
+  caret-color: CanvasText;
+  user-select: text;
+}
+
+.text-layer :is(span, br) {
+  cursor: text;
+  user-select: text;
+}
+
+.text-layer span[role="img"] {
+  cursor: default;
+  user-select: none;
+}
+
+.text-layer .text-selection-end {
+  position: absolute;
+  z-index: 0;
+  inset: 100% 0 0;
+  display: block;
+  cursor: default;
+  user-select: none;
+}
+
+.text-layer.selecting .text-selection-end {
+  top: 0;
+}
