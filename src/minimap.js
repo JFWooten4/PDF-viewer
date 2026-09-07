@@ -88,26 +88,26 @@ function syncMinimap() {
   const pages = Array.from(viewer.querySelectorAll(".page"));
   const tiles = ensureTiles(pages);
   const trackHeight = minimap.clientHeight;
-  const { documentHeight, scrollMaximum } = documentMetrics();
+  const { scrollMaximum } = documentMetrics();
 
-  // Keep a page's thumbnail scale independent of document length and window height.
+  // Keep page thumbnails contiguous even when the full viewer separates pages.
   const pageWidth = pages[0]?.getBoundingClientRect().width || 1;
   const thumbnailWidth = tiles[0]?.clientWidth || 80;
   const scale = thumbnailWidth / pageWidth;
-  const contentHeight = documentHeight * scale;
+  const tileHeights = pages.map((page) => Math.max(1, page.getBoundingClientRect().height * scale));
+  const contentHeight = tileHeights.reduce((total, height) => total + height, 0);
   mapHeight = Math.min(trackHeight, contentHeight);
   const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
   const mapOffset = scrollRatio * Math.max(contentHeight - trackHeight, 0);
 
+  let packedTop = 0;
   pages.forEach((page, index) => {
     const tile = tiles[index];
-    const rect = page.getBoundingClientRect();
-    const documentTop = rect.top + window.scrollY;
-    const tileTop = documentTop * scale - mapOffset;
-    const tileHeight = Math.max(1, rect.height * scale);
+    const tileHeight = tileHeights[index];
 
-    tile.style.top = `${tileTop}px`;
+    tile.style.top = `${packedTop - mapOffset}px`;
     tile.style.height = `${tileHeight}px`;
+    packedTop += tileHeight;
     syncThumbnail(page, tile);
   });
 
