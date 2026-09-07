@@ -42,6 +42,7 @@ await Promise.all([
   cp("src/background.js", `${outdir}/background.js`),
   cp("src/viewer.html", `${outdir}/viewer.html`),
   cp("src/viewer.css", `${outdir}/viewer.css`),
+  cp("src/toolbar-layout.css", `${outdir}/toolbar-layout.css`),
   cp("src/qr-file-url.css", `${outdir}/qr-file-url.css`),
   cp("src/minimap.js", `${outdir}/minimap.js`),
   cp("src/minimap.css", `${outdir}/minimap.css`),
