@@ -10,6 +10,7 @@ let syncFrame;
 let dragging = false;
 let dragOffset = 0;
 let viewportHeight = 18;
+let mapHeight = 0;
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -73,9 +74,8 @@ function documentMetrics() {
 }
 
 function viewportTopFromScrollPosition() {
-  const trackHeight = minimap.clientHeight;
   const { scrollMaximum } = documentMetrics();
-  const viewportTravel = Math.max(trackHeight - viewportHeight, 0);
+  const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
   const scrollRatio = scrollMaximum > 0 ? window.scrollY / scrollMaximum : 0;
   return clamp(scrollRatio, 0, 1) * viewportTravel;
 }
@@ -90,12 +90,21 @@ function syncMinimap() {
   const trackHeight = minimap.clientHeight;
   const { documentHeight, scrollMaximum } = documentMetrics();
 
+  // Keep a page's thumbnail scale independent of document length and window height.
+  const pageWidth = pages[0]?.getBoundingClientRect().width || 1;
+  const thumbnailWidth = tiles[0]?.clientWidth || 80;
+  const scale = thumbnailWidth / pageWidth;
+  const contentHeight = documentHeight * scale;
+  mapHeight = Math.min(trackHeight, contentHeight);
+  const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
+  const mapOffset = scrollRatio * Math.max(contentHeight - trackHeight, 0);
+
   pages.forEach((page, index) => {
     const tile = tiles[index];
     const rect = page.getBoundingClientRect();
     const documentTop = rect.top + window.scrollY;
-    const tileTop = (documentTop / documentHeight) * trackHeight;
-    const tileHeight = Math.max(1, (rect.height / documentHeight) * trackHeight);
+    const tileTop = documentTop * scale - mapOffset;
+    const tileHeight = Math.max(1, rect.height * scale);
 
     tile.style.top = `${tileTop}px`;
     tile.style.height = `${tileHeight}px`;
@@ -103,10 +112,11 @@ function syncMinimap() {
   });
 
   viewportHeight = Math.min(
-    trackHeight,
-    Math.max(18, (window.innerHeight / documentHeight) * trackHeight),
+    mapHeight,
+    Math.max(18, window.innerHeight * scale),
   );
-  const viewportTop = viewportTopFromScrollPosition();
+  const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
+  const viewportTop = clamp(scrollRatio, 0, 1) * viewportTravel;
 
   minimapViewport.style.top = `${viewportTop}px`;
   minimapViewport.style.height = `${viewportHeight}px`;
@@ -115,9 +125,8 @@ function syncMinimap() {
 }
 
 function scrollFromViewportTop(viewportTop) {
-  const trackHeight = minimap.clientHeight;
   const { scrollMaximum } = documentMetrics();
-  const viewportTravel = Math.max(trackHeight - viewportHeight, 0);
+  const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
   const ratio = viewportTravel > 0 ? clamp(viewportTop / viewportTravel, 0, 1) : 0;
   window.scrollTo({ top: ratio * scrollMaximum, behavior: "auto" });
 }

@@ -59,7 +59,7 @@
     transform: none;
   }
 
-  .minimap {
+  body .minimap {
     top: 100px;
   }
 
