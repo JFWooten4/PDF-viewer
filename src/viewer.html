@@ -34,26 +34,28 @@
         <span>/ <span id="page-count">—</span></span>
       </label>
       <button id="next-page" class="icon-button" type="button" aria-label="Next page" title="Next page">→</button>
-      <button id="copy-file-url" class="mark-button" type="button" aria-label="Copy file URL" title="Copy file URL">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M10.5 13.5l3-3" />
-          <path d="M8.25 15.75l-1.5 1.5a3.182 3.182 0 01-4.5-4.5l3-3a3.182 3.182 0 014.5 0" />
-          <path d="M15.75 8.25l1.5-1.5a3.182 3.182 0 014.5 4.5l-3 3a3.182 3.182 0 01-4.5 0" />
-        </svg>
-      </button>
-      <div class="search-control" role="search" aria-label="Search PDF">
-        <span class="search-icon" aria-hidden="true">⌕</span>
-        <input
-          id="search-input"
-          type="search"
-          autocomplete="off"
-          spellcheck="false"
-          placeholder="Search"
-          aria-label="Search document"
-        />
-        <span id="search-count" class="search-count" aria-live="polite"></span>
-        <button id="search-previous" class="search-nav-button" type="button" aria-label="Previous search result" title="Previous result" disabled>↑</button>
-        <button id="search-next" class="search-nav-button" type="button" aria-label="Next search result" title="Next result" disabled>↓</button>
+      <div class="search-tools">
+        <button id="copy-file-url" class="mark-button" type="button" aria-label="Copy file URL" title="Copy file URL">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M10.5 13.5l3-3" />
+            <path d="M8.25 15.75l-1.5 1.5a3.182 3.182 0 01-4.5-4.5l3-3a3.182 3.182 0 014.5 0" />
+            <path d="M15.75 8.25l1.5-1.5a3.182 3.182 0 014.5 4.5l-3 3a3.182 3.182 0 01-4.5 0" />
+          </svg>
+        </button>
+        <div class="search-control" role="search" aria-label="Search PDF">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input
+            id="search-input"
+            type="search"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Search"
+            aria-label="Search document"
+          />
+          <span id="search-count" class="search-count" aria-live="polite"></span>
+          <button id="search-previous" class="search-nav-button" type="button" aria-label="Previous search result" title="Previous result" disabled>↑</button>
+          <button id="search-next" class="search-nav-button" type="button" aria-label="Next search result" title="Next result" disabled>↓</button>
+        </div>
       </div>
       <div class="spacer"></div>
       <button id="theme-toggle" class="mark-button theme-button" type="button" aria-label="Switch theme" title="Switch theme">
