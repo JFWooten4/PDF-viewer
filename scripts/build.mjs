@@ -48,6 +48,7 @@ await Promise.all([
   cp("src/search-highlight-cues.js", `${outdir}/search-highlight-cues.js`),
   cp("src/toolbar-layout.css", `${outdir}/toolbar-layout.css`),
   cp("src/qr-file-url.css", `${outdir}/qr-file-url.css`),
+  cp("src/annotation-layer.css", `${outdir}/annotation-layer.css`),
   cp("src/minimap.js", `${outdir}/minimap.js`),
   cp("src/minimap.css", `${outdir}/minimap.css`),
   cp("src/copy-file-url.js", `${outdir}/copy-file-url.js`),
