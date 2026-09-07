@@ -33,6 +33,8 @@ await Promise.all([
   cp("src/background.js", `${outdir}/background.js`),
   cp("src/viewer.html", `${outdir}/viewer.html`),
   cp("src/viewer.css", `${outdir}/viewer.css`),
+  cp("src/minimap.js", `${outdir}/minimap.js`),
+  cp("src/minimap.css", `${outdir}/minimap.css`),
   cp("src/copy-file-url.js", `${outdir}/copy-file-url.js`),
   cp("src/image-color-toggle.css", `${outdir}/image-color-toggle.css`),
   cp("src/image-color-toggle.js", `${outdir}/image-color-toggle.js`),
