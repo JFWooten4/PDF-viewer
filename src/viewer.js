@@ -68,6 +68,8 @@ let searchRequestId = 0;
 let completedSearchQuery = "";
 let searchMatches = [];
 let activeSearchIndex = -1;
+let sectionEntries = [];
+let sectionHighlightRequestId = 0;
 let renderGeneration = 0;
 let renderQueuePromise;
 const priorityRenderQueue = new Set();
@@ -164,6 +166,10 @@ function setCurrentPage(pageNumber) {
   previousButton.disabled = currentPage <= 1;
   nextButton.disabled = currentPage >= pdfDocument.numPages;
   void queuePageRender(currentPage, true);
+
+  if (!sectionPopover.hidden) {
+    void updateCurrentSectionHighlight();
+  }
 
   if (!mimeHandlerActive) {
     const viewerUrl = new URL(window.location.href);
@@ -306,6 +312,78 @@ async function copySectionReference(reference) {
   }
 }
 
+async function resolveOutlinePageNumber(item) {
+  let destination = item.dest;
+
+  if (typeof destination === "string") {
+    destination = await pdfDocument.getDestination(destination);
+  }
+
+  if (!Array.isArray(destination) || destination.length === 0) {
+    return null;
+  }
+
+  const pageReference = destination[0];
+  const pageIndex = Number.isInteger(pageReference)
+    ? pageReference
+    : await pdfDocument.getPageIndex(pageReference);
+
+  return pageIndex + 1;
+}
+
+function sectionEntryPageNumber(entry) {
+  if (!entry.pageNumberPromise) {
+    entry.pageNumberPromise = resolveOutlinePageNumber(entry.item).catch(() => null);
+  }
+
+  return entry.pageNumberPromise;
+}
+
+async function updateCurrentSectionHighlight(scrollToCurrent = false) {
+  if (!sectionEntries.length) {
+    return;
+  }
+
+  const requestId = ++sectionHighlightRequestId;
+  const pageNumbers = await Promise.all(sectionEntries.map(sectionEntryPageNumber));
+
+  if (requestId !== sectionHighlightRequestId) {
+    return;
+  }
+
+  let activeIndex = -1;
+  let activePage = 0;
+
+  for (let index = 0; index < sectionEntries.length; index += 1) {
+    const pageNumber = pageNumbers[index];
+    if (pageNumber === null || pageNumber > currentPage) {
+      continue;
+    }
+
+    if (pageNumber > activePage || (pageNumber === activePage && index > activeIndex)) {
+      activeIndex = index;
+      activePage = pageNumber;
+    }
+  }
+
+  for (let index = 0; index < sectionEntries.length; index += 1) {
+    const row = sectionEntries[index].row;
+    const isCurrent = index === activeIndex;
+    row.style.background = isCurrent ? "#29292d" : "";
+    row.style.borderRadius = isCurrent ? "7px" : "";
+
+    if (isCurrent) {
+      row.setAttribute("aria-current", "location");
+    } else {
+      row.removeAttribute("aria-current");
+    }
+  }
+
+  if (scrollToCurrent && activeIndex >= 0) {
+    sectionEntries[activeIndex].row.scrollIntoView({ block: "nearest" });
+  }
+}
+
 function closeSectionPopover() {
   sectionPopover.hidden = true;
   sectionToggle.setAttribute("aria-expanded", "false");
@@ -315,30 +393,20 @@ function toggleSectionPopover() {
   const opening = sectionPopover.hidden;
   sectionPopover.hidden = !opening;
   sectionToggle.setAttribute("aria-expanded", String(opening));
+
+  if (opening) {
+    void updateCurrentSectionHighlight(true);
+  }
 }
 
 async function navigateToOutlineItem(item) {
   try {
-    let destination = item.dest;
-
-    if (typeof destination === "string") {
-      destination = await pdfDocument.getDestination(destination);
-    }
-
-    if (!Array.isArray(destination) || destination.length === 0) {
+    const pageNumber = await resolveOutlinePageNumber(item);
+    if (pageNumber === null) {
       return;
     }
 
-    const pageReference = destination[0];
-    let pageIndex;
-
-    if (Number.isInteger(pageReference)) {
-      pageIndex = pageReference;
-    } else {
-      pageIndex = await pdfDocument.getPageIndex(pageReference);
-    }
-
-    goToPage(pageIndex + 1);
+    goToPage(pageNumber);
     closeSectionPopover();
   } catch {
     showToast("Could not open that section");
@@ -374,6 +442,7 @@ function createOutlineList(items, parentReference = "") {
     row.className = "section-entry-row";
 
     if (hasDestination) {
+      sectionEntries.push({ item, row, pageNumberPromise: null });
       const button = document.createElement("button");
       button.type = "button";
       button.className = "section-link";
@@ -421,6 +490,7 @@ async function initializeSectionNavigation() {
     return;
   }
 
+  sectionEntries = [];
   const outlineList = createOutlineList(outline);
   if (!outlineList.childElementCount) {
     return;
