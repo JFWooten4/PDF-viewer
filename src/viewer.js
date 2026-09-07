@@ -627,6 +627,9 @@ async function renderPageNow(pageNumber) {
   const cssWidth = Math.max(280, container.clientWidth);
   const viewport = page.getViewport({ scale: cssWidth / baseViewport.width, rotation });
   const annotationViewport = viewport.clone({ dontFlip: true });
+  container.style.setProperty("--total-scale-factor", String(viewport.scale));
+  container.style.setProperty("--scale-round-x", "1px");
+  container.style.setProperty("--scale-round-y", "1px");
   const outputScale = Math.min(window.devicePixelRatio || 1, 2);
   const renderTransform =
     outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0];
