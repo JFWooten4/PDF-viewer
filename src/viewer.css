@@ -2,14 +2,14 @@
   color-scheme: dark;
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --page-filter: invert(0.94) hue-rotate(180deg);
-  --body-bg: #0b0b0c;
+  --body-bg: #000000;
   --text: #f3f4f6;
   --muted: #b8b8bd;
   --toolbar-bg: rgb(20 20 22 / 94%);
   --border: #36363a;
   --control-bg: #242427;
   --control-hover: #303034;
-  --page-bg: #050505;
+  --page-bg: #000000;
   --placeholder: #5b5b60;
   --toast-bg: #202023;
   --search-bg: #1d1d20;
@@ -460,7 +460,7 @@ input {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0;
+  gap: 12px;
   min-height: 100vh;
   padding: 76px 16px 28px;
 }
@@ -489,6 +489,16 @@ input {
 
 .page.rendered::before {
   content: none;
+}
+
+.page.rendered {
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 10%),
+    0 0 10px rgb(255 255 255 / 6%);
+}
+
+:root[data-theme="light"] .page.rendered {
+  box-shadow: none;
 }
 
 .page canvas {
@@ -636,6 +646,10 @@ input {
     break-after: page;
     border: 0;
     border-radius: 0;
+    box-shadow: none;
+  }
+
+  .page.rendered {
     box-shadow: none;
   }
 }

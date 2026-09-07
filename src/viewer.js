@@ -1,4 +1,5 @@
-import { getDocument, GlobalWorkerOptions, TextLayer } from "../node_modules/pdfjs-dist/build/pdf.mjs";
+import { AnnotationLayer, getDocument, GlobalWorkerOptions, TextLayer } from "../node_modules/pdfjs-dist/build/pdf.mjs";
+import { EventBus, PDFLinkService } from "../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -55,6 +56,7 @@ const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
 const SCANNED_PAGE_IMAGE_AREA_THRESHOLD = 0.8;
 
 let pdfDocument;
+let pdfLinkService;
 let originalUrl;
 let requestUrl;
 let fileName = "document.pdf";
@@ -624,13 +626,19 @@ async function renderPageNow(pageNumber) {
   const baseViewport = page.getViewport({ scale: 1, rotation });
   const cssWidth = Math.max(280, container.clientWidth);
   const viewport = page.getViewport({ scale: cssWidth / baseViewport.width, rotation });
+  const annotationViewport = viewport.clone({ dontFlip: true });
+  container.style.setProperty("--total-scale-factor", String(viewport.scale));
+  container.style.setProperty("--scale-round-x", "1px");
+  container.style.setProperty("--scale-round-y", "1px");
   const outputScale = Math.min(window.devicePixelRatio || 1, 2);
   const renderTransform =
     outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0];
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d", { alpha: false });
   const textLayer = document.createElement("div");
+  const annotationLayer = document.createElement("div");
   textLayer.className = "text-layer";
+  annotationLayer.className = "annotation-layer";
 
   canvas.width = Math.floor(viewport.width * outputScale);
   canvas.height = Math.floor(viewport.height * outputScale);
@@ -653,7 +661,39 @@ async function renderPageNow(pageNumber) {
     transform: renderTransform,
     recordImages: true,
   });
-  await Promise.all([renderTask.promise, textLayerTask.render()]);
+  const [annotations] = await Promise.all([
+    page.getAnnotations({ intent: "display" }),
+    renderTask.promise,
+    textLayerTask.render(),
+  ]);
+
+  if (generation !== renderGeneration) {
+    page.cleanup();
+    return;
+  }
+
+  if (annotations.length) {
+    const annotationLayerTask = new AnnotationLayer({
+      accessibilityManager: null,
+      annotationCanvasMap: null,
+      annotationEditorUIManager: null,
+      annotationStorage: pdfDocument.annotationStorage,
+      commentManager: null,
+      div: annotationLayer,
+      linkService: pdfLinkService,
+      page,
+      structTreeLayer: null,
+      viewport: annotationViewport,
+    });
+    await annotationLayerTask.render({
+      annotations,
+      div: annotationLayer,
+      linkService: pdfLinkService,
+      page,
+      renderForms: false,
+      viewport: annotationViewport,
+    });
+  }
 
   if (generation !== renderGeneration) {
     page.cleanup();
@@ -668,7 +708,12 @@ async function renderPageNow(pageNumber) {
 
   container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
   highlightTextLayer(textLayer, completedSearchQuery);
-  container.replaceChildren(canvas, ...(imageOverlay ? [imageOverlay] : []), textLayer);
+  container.replaceChildren(
+    canvas,
+    ...(imageOverlay ? [imageOverlay] : []),
+    textLayer,
+    ...(annotations.length ? [annotationLayer] : []),
+  );
   container.classList.add("rendered");
   renderedPages.add(pageNumber);
   page.cleanup();
@@ -1084,6 +1129,7 @@ async function initialize() {
   const documentOptions = {
     cMapUrl: extensionAssetUrl("node_modules/pdfjs-dist/cmaps/", "cmaps/"),
     cMapPacked: true,
+    docBaseUrl: requestUrl.href,
     standardFontDataUrl: extensionAssetUrl(
       "node_modules/pdfjs-dist/standard_fonts/",
       "standard_fonts/",
@@ -1100,6 +1146,17 @@ async function initialize() {
 
   const loadingTask = getDocument(documentOptions);
   pdfDocument = await loadingTask.promise;
+  pdfLinkService = new PDFLinkService({
+    eventBus: new EventBus(),
+    externalLinkTarget: 2,
+    externalLinkRel: "noopener noreferrer",
+  });
+  pdfLinkService.setDocument(pdfDocument);
+  pdfLinkService.setViewer({
+    scrollPageIntoView({ pageNumber }) {
+      goToPage(pageNumber);
+    },
+  });
   currentPage = Math.min(requestedPage, pdfDocument.numPages);
   pageCount.textContent = String(pdfDocument.numPages);
   pageNumberInput.max = String(pdfDocument.numPages);
