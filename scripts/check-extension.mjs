@@ -59,6 +59,8 @@ await validateManifest("dist/manifest.json", {
 for (const path of [
   "dist/viewer.js",
   "dist/viewer.css",
+  "dist/summarize-with-chatgpt.js",
+  "dist/chatgpt-summary.js",
   "dist/qr-file-url.js",
   "dist/qr-file-url.css",
   "dist/pdf.worker.min.mjs",
