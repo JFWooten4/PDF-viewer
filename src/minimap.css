@@ -50,8 +50,6 @@
   left: 8px;
   min-height: 1px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  border-radius: 1px;
   background: var(--page-bg);
   opacity: 0.82;
 }
