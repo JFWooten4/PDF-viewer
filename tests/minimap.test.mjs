@@ -37,6 +37,13 @@ test('short documents keep fixed thumbnail heights at the top after resize', () 
   assert.equal(parseFloat(f.tiles[0].style.height), 112);
 });
 
+test('minimap packs page thumbnails without viewer gaps', () => {
+  const f = fixture(3);
+  assert.equal(parseFloat(f.tiles[0].style.top), 0);
+  assert.equal(parseFloat(f.tiles[1].style.top), 112);
+  assert.equal(parseFloat(f.tiles[2].style.top), 224);
+});
+
 test('long documents retain page scale and expose the final page at the bottom', () => {
   const f = fixture(100);
   f.window.scrollY = 142000 - f.window.innerHeight;
