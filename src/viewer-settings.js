@@ -134,20 +134,35 @@ function addZoomStyles() {
     }
 
     .zoom-level {
-      width: 56px;
+      width: 46px;
       color: var(--muted);
       font-size: 12px;
       font-variant-numeric: tabular-nums;
+      cursor: default;
     }
 
-    .fit-page-button {
+    .fit-height-button,
+    .fit-width-button {
+      width: 36px;
+    }
+
+    .fit-height-button {
+      border-right: 1px solid var(--border);
+    }
+
+    .fit-width-button {
       border-left: 1px solid var(--border);
-      font-size: 17px;
+    }
+
+    .fit-icon {
+      width: 19px;
+      height: 19px;
+      vertical-align: middle;
     }
 
     .zoom-button:hover:not(:disabled),
-    .zoom-level:hover:not(:disabled),
-    .fit-page-button[aria-pressed="true"] {
+    .fit-height-button[aria-pressed="true"],
+    .fit-width-button[aria-pressed="true"] {
       background: var(--control-hover);
       color: var(--text);
     }
@@ -182,8 +197,13 @@ function addZoomStyles() {
         width: 30px;
       }
 
+      .fit-height-button,
+      .fit-width-button {
+        width: 32px;
+      }
+
       .zoom-level {
-        width: 48px;
+        width: 42px;
       }
     }
 
@@ -201,6 +221,30 @@ function addZoomStyles() {
   document.head.append(style);
 }
 
+function fitHeightIcon() {
+  return `
+    <svg class="fit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M7 3h10" />
+      <path d="M7 21h10" />
+      <path d="M12 6v12" />
+      <path d="m9 9 3-3 3 3" />
+      <path d="m9 15 3 3 3-3" />
+    </svg>
+  `;
+}
+
+function fitWidthIcon() {
+  return `
+    <svg class="fit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M3 7v10" />
+      <path d="M21 7v10" />
+      <path d="M6 12h12" />
+      <path d="m9 9-3 3 3 3" />
+      <path d="m15 9 3 3-3 3" />
+    </svg>
+  `;
+}
+
 function createZoomControls() {
   const nextPageButton = document.querySelector("#next-page");
   if (!nextPageButton) {
@@ -212,6 +256,15 @@ function createZoomControls() {
   control.setAttribute("role", "group");
   control.setAttribute("aria-label", "Zoom controls");
 
+  const fitHeightButton = document.createElement("button");
+  fitHeightButton.id = "fit-height";
+  fitHeightButton.className = "zoom-button fit-height-button";
+  fitHeightButton.type = "button";
+  fitHeightButton.innerHTML = fitHeightIcon();
+  fitHeightButton.title = "Fit page height to viewport";
+  fitHeightButton.setAttribute("aria-label", "Fit page height to viewport");
+  fitHeightButton.setAttribute("aria-pressed", "false");
+
   const zoomOutButton = document.createElement("button");
   zoomOutButton.id = "zoom-out";
   zoomOutButton.className = "zoom-button";
@@ -220,13 +273,11 @@ function createZoomControls() {
   zoomOutButton.title = "Zoom out";
   zoomOutButton.setAttribute("aria-label", "Zoom out");
 
-  const zoomLevelButton = document.createElement("button");
-  zoomLevelButton.id = "zoom-level";
-  zoomLevelButton.className = "zoom-level";
-  zoomLevelButton.type = "button";
-  zoomLevelButton.textContent = "100%";
-  zoomLevelButton.title = "Fit width";
-  zoomLevelButton.setAttribute("aria-label", "Zoom 100%. Reset to fit width");
+  const zoomLevel = document.createElement("span");
+  zoomLevel.id = "zoom-level";
+  zoomLevel.className = "zoom-level";
+  zoomLevel.textContent = "100%";
+  zoomLevel.setAttribute("aria-label", "Zoom 100%");
 
   const zoomInButton = document.createElement("button");
   zoomInButton.id = "zoom-in";
@@ -236,24 +287,31 @@ function createZoomControls() {
   zoomInButton.title = "Zoom in";
   zoomInButton.setAttribute("aria-label", "Zoom in");
 
-  const fitPageButton = document.createElement("button");
-  fitPageButton.id = "fit-page";
-  fitPageButton.className = "zoom-button fit-page-button";
-  fitPageButton.type = "button";
-  fitPageButton.textContent = "⛶";
-  fitPageButton.title = "Fit page to viewport";
-  fitPageButton.setAttribute("aria-label", "Fit page to viewport");
-  fitPageButton.setAttribute("aria-pressed", "false");
+  const fitWidthButton = document.createElement("button");
+  fitWidthButton.id = "fit-width";
+  fitWidthButton.className = "zoom-button fit-width-button";
+  fitWidthButton.type = "button";
+  fitWidthButton.innerHTML = fitWidthIcon();
+  fitWidthButton.title = "Fit page width to viewport";
+  fitWidthButton.setAttribute("aria-label", "Fit page width to viewport");
+  fitWidthButton.setAttribute("aria-pressed", "true");
 
-  control.append(zoomOutButton, zoomLevelButton, zoomInButton, fitPageButton);
+  control.append(
+    fitHeightButton,
+    zoomOutButton,
+    zoomLevel,
+    zoomInButton,
+    fitWidthButton,
+  );
   nextPageButton.insertAdjacentElement("afterend", control);
 
   return {
     control,
+    fitHeightButton,
     zoomOutButton,
-    zoomLevelButton,
+    zoomLevel,
     zoomInButton,
-    fitPageButton,
+    fitWidthButton,
   };
 }
 
@@ -292,15 +350,15 @@ function pageRatio(pageElement) {
 function targetPageWidth(pageElement) {
   const baseWidth = fitWidthBase();
 
-  if (zoomMode === "fit-page") {
-    return Math.min(viewportPageWidth(), viewportPageHeight() * pageRatio(pageElement));
+  if (zoomMode === "fit-height") {
+    return viewportPageHeight() * pageRatio(pageElement);
   }
 
   if (zoomMode === "custom") {
     return baseWidth * zoomScale;
   }
 
-  return baseWidth;
+  return viewportPageWidth();
 }
 
 function applyPageZoom(pageElement) {
@@ -334,17 +392,12 @@ function syncZoomControls() {
   const scale = Math.max(0, currentRelativeScale());
   const percentage = Math.round(scale * 100);
 
-  zoomControls.zoomLevelButton.textContent = `${percentage}%`;
-  zoomControls.zoomLevelButton.title = zoomMode === "fit-width"
-    ? "Fit width"
-    : "Reset zoom to fit width";
-  zoomControls.zoomLevelButton.setAttribute(
-    "aria-label",
-    `Zoom ${percentage}%. Reset to fit width`,
-  );
+  zoomControls.zoomLevel.textContent = `${percentage}%`;
+  zoomControls.zoomLevel.setAttribute("aria-label", `Zoom ${percentage}%`);
   zoomControls.zoomOutButton.disabled = scale <= MIN_ZOOM + 0.001;
   zoomControls.zoomInButton.disabled = scale >= MAX_ZOOM - 0.001;
-  zoomControls.fitPageButton.setAttribute("aria-pressed", String(zoomMode === "fit-page"));
+  zoomControls.fitHeightButton.setAttribute("aria-pressed", String(zoomMode === "fit-height"));
+  zoomControls.fitWidthButton.setAttribute("aria-pressed", String(zoomMode === "fit-width"));
 }
 
 function forceViewerRerender() {
@@ -390,8 +443,8 @@ function fitWidth() {
   scheduleViewerRerender();
 }
 
-function fitPageToViewport() {
-  zoomMode = "fit-page";
+function fitHeight() {
+  zoomMode = "fit-height";
   applyZoomLayout();
   syncZoomControls();
   scheduleViewerRerender();
@@ -399,10 +452,10 @@ function fitPageToViewport() {
 
 if (zoomControls) {
   addZoomStyles();
+  zoomControls.fitHeightButton.addEventListener("click", fitHeight);
   zoomControls.zoomOutButton.addEventListener("click", () => zoomBy(-ZOOM_STEP));
   zoomControls.zoomInButton.addEventListener("click", () => zoomBy(ZOOM_STEP));
-  zoomControls.zoomLevelButton.addEventListener("click", fitWidth);
-  zoomControls.fitPageButton.addEventListener("click", fitPageToViewport);
+  zoomControls.fitWidthButton.addEventListener("click", fitWidth);
 
   document.addEventListener(
     "keydown",

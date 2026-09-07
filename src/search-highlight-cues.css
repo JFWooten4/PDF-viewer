@@ -1,0 +1,17 @@
+.text-layer .search-highlight {
+  clip-path: inset(0 0 0 1px round 2px);
+}
+
+.search-line-arrow {
+  position: absolute;
+  left: 7px;
+  z-index: 4;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid rgb(67 175 73 / 92%);
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 55%));
+  pointer-events: none;
+  transform: translateY(-50%);
+}
