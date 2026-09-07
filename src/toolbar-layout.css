@@ -1,6 +1,6 @@
 .toolbar {
-  --search-width: clamp(158px, calc(100vw - 742px), 498px);
-  --search-half-width: clamp(79px, calc(50vw - 371px), 249px);
+  --search-width: clamp(158px, calc(100vw - 902px), 498px);
+  --search-half-width: clamp(79px, calc(50vw - 451px), 249px);
   justify-content: flex-start;
   padding-left: 50px;
 }
@@ -91,7 +91,7 @@
 }
 
 /* Give search its own row when the navigation controls need more room. */
-@media (max-width: 1100px) {
+@media (max-width: 1060px) {
   .toolbar {
     height: 100px;
     align-items: flex-start;
@@ -129,4 +129,13 @@
 #copy-file-url {
   flex: 0 0 30px;
   color: var(--text);
+}
+
+.tools {
+  z-index: 2;
+}
+
+@media (max-width: 1130px) and (min-width: 1061px) {
+  .search-control input { min-width: 0; }
+  .search-count { display: none; }
 }
