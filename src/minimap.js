@@ -3,10 +3,14 @@ const minimap = document.querySelector("#minimap");
 const minimapPages = document.querySelector("#minimap-pages");
 const minimapViewport = document.querySelector("#minimap-viewport");
 
+const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
+const WHEEL_LINE_HEIGHT = 16;
+
 let syncFrame;
 let dragging = false;
 let dragOffset = 0;
 let viewportHeight = 18;
+let mapHeight = 0;
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -69,6 +73,13 @@ function documentMetrics() {
   return { documentHeight, scrollMaximum };
 }
 
+function viewportTopFromScrollPosition() {
+  const { scrollMaximum } = documentMetrics();
+  const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
+  const scrollRatio = scrollMaximum > 0 ? window.scrollY / scrollMaximum : 0;
+  return clamp(scrollRatio, 0, 1) * viewportTravel;
+}
+
 function syncMinimap() {
   if (!minimap || minimap.clientHeight === 0) {
     return;
@@ -79,12 +90,21 @@ function syncMinimap() {
   const trackHeight = minimap.clientHeight;
   const { documentHeight, scrollMaximum } = documentMetrics();
 
+  // Keep a page's thumbnail scale independent of document length and window height.
+  const pageWidth = pages[0]?.getBoundingClientRect().width || 1;
+  const thumbnailWidth = tiles[0]?.clientWidth || 80;
+  const scale = thumbnailWidth / pageWidth;
+  const contentHeight = documentHeight * scale;
+  mapHeight = Math.min(trackHeight, contentHeight);
+  const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
+  const mapOffset = scrollRatio * Math.max(contentHeight - trackHeight, 0);
+
   pages.forEach((page, index) => {
     const tile = tiles[index];
     const rect = page.getBoundingClientRect();
     const documentTop = rect.top + window.scrollY;
-    const tileTop = (documentTop / documentHeight) * trackHeight;
-    const tileHeight = Math.max(1, (rect.height / documentHeight) * trackHeight);
+    const tileTop = documentTop * scale - mapOffset;
+    const tileHeight = Math.max(1, rect.height * scale);
 
     tile.style.top = `${tileTop}px`;
     tile.style.height = `${tileHeight}px`;
@@ -92,11 +112,10 @@ function syncMinimap() {
   });
 
   viewportHeight = Math.min(
-    trackHeight,
-    Math.max(18, (window.innerHeight / documentHeight) * trackHeight),
+    mapHeight,
+    Math.max(18, window.innerHeight * scale),
   );
-  const viewportTravel = Math.max(trackHeight - viewportHeight, 0);
-  const scrollRatio = scrollMaximum > 0 ? window.scrollY / scrollMaximum : 0;
+  const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
   const viewportTop = clamp(scrollRatio, 0, 1) * viewportTravel;
 
   minimapViewport.style.top = `${viewportTop}px`;
@@ -106,11 +125,22 @@ function syncMinimap() {
 }
 
 function scrollFromViewportTop(viewportTop) {
-  const trackHeight = minimap.clientHeight;
   const { scrollMaximum } = documentMetrics();
-  const viewportTravel = Math.max(trackHeight - viewportHeight, 0);
+  const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
   const ratio = viewportTravel > 0 ? clamp(viewportTop / viewportTravel, 0, 1) : 0;
   window.scrollTo({ top: ratio * scrollMaximum, behavior: "auto" });
+}
+
+function normalizedWheelDelta(event) {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    return event.deltaY * WHEEL_LINE_HEIGHT;
+  }
+
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    return event.deltaY * minimap.clientHeight;
+  }
+
+  return event.deltaY;
 }
 
 function pointerPosition(event) {
@@ -155,6 +185,21 @@ function endDrag(event) {
 
 minimap.addEventListener("pointerup", endDrag);
 minimap.addEventListener("pointercancel", endDrag);
+
+minimap.addEventListener(
+  "wheel",
+  (event) => {
+    const delta = normalizedWheelDelta(event);
+    if (!delta) {
+      return;
+    }
+
+    const viewportTop = viewportTopFromScrollPosition();
+    scrollFromViewportTop(viewportTop + delta * MINIMAP_WHEEL_TRACK_SCALE);
+    event.preventDefault();
+  },
+  { passive: false },
+);
 
 minimap.addEventListener("keydown", (event) => {
   const pageStep = Math.max(window.innerHeight - 80, 120);
