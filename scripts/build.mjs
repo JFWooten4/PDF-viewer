@@ -42,6 +42,8 @@ await Promise.all([
   cp("src/background.js", `${outdir}/background.js`),
   cp("src/viewer.html", `${outdir}/viewer.html`),
   cp("src/viewer.css", `${outdir}/viewer.css`),
+  cp("src/text-selection.css", `${outdir}/text-selection.css`),
+  cp("src/text-selection.js", `${outdir}/text-selection.js`),
   cp("src/search-highlight-cues.css", `${outdir}/search-highlight-cues.css`),
   cp("src/search-highlight-cues.js", `${outdir}/search-highlight-cues.js`),
   cp("src/toolbar-layout.css", `${outdir}/toolbar-layout.css`),
