@@ -26,6 +26,7 @@ const shareIcon = document.querySelector("#share-icon");
 const sectionNav = document.querySelector("#section-nav");
 const sectionToggle = document.querySelector("#section-toggle");
 const sectionPopover = document.querySelector("#section-popover");
+const sectionDocumentTitle = document.querySelector("#section-document-title");
 const sectionList = document.querySelector("#section-list");
 const themeButton = document.querySelector("#theme-toggle");
 const themeIcon = document.querySelector("#theme-icon");
@@ -477,6 +478,22 @@ function createOutlineList(items, parentReference = "") {
   return list;
 }
 
+async function getPdfMetadataTitle() {
+  try {
+    const { info, metadata } = await pdfDocument.getMetadata();
+    const infoTitle = typeof info?.Title === "string" ? info.Title.trim() : "";
+
+    if (infoTitle) {
+      return infoTitle;
+    }
+
+    const xmpTitle = metadata?.get?.("dc:title");
+    return typeof xmpTitle === "string" ? xmpTitle.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
 async function initializeSectionNavigation() {
   let outline;
 
@@ -494,6 +511,12 @@ async function initializeSectionNavigation() {
   const outlineList = createOutlineList(outline);
   if (!outlineList.childElementCount) {
     return;
+  }
+
+  const metadataTitle = await getPdfMetadataTitle();
+  if (metadataTitle) {
+    sectionDocumentTitle.textContent = metadataTitle;
+    sectionDocumentTitle.hidden = false;
   }
 
   sectionList.replaceChildren(outlineList);
@@ -1057,7 +1080,6 @@ async function initialize() {
   if (!fileName.toLowerCase().endsWith(".pdf")) {
     fileName += ".pdf";
   }
-  document.title = fileName;
 
   const documentOptions = {
     cMapUrl: extensionAssetUrl("node_modules/pdfjs-dist/cmaps/", "cmaps/"),

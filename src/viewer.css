@@ -204,6 +204,19 @@ input {
   box-shadow: 0 16px 44px rgb(0 0 0 / 42%);
 }
 
+.section-document-title {
+  padding: 13px 13px 10px;
+  color: #f1f1f3;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.section-document-title:not([hidden]) + .section-popover-title {
+  padding-top: 8px;
+}
+
 .section-popover-title {
   position: sticky;
   top: 0;
