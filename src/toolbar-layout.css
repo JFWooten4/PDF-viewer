@@ -1,6 +1,6 @@
 .toolbar {
-  --search-width: clamp(120px, calc(100vw - 780px), 460px);
-  --search-half-width: clamp(60px, calc(50vw - 390px), 230px);
+  --search-width: clamp(158px, calc(100vw - 742px), 498px);
+  --search-half-width: clamp(79px, calc(50vw - 371px), 249px);
   justify-content: flex-start;
   padding-left: 50px;
 }
@@ -13,7 +13,10 @@
   align-self: auto;
 }
 
-.search-control {
+.search-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   position: absolute;
   top: 8px;
   left: 50%;
@@ -39,6 +42,37 @@
   min-width: 0;
 }
 
+/* Use crisp SVG toolbar glyphs instead of tiny CSS-drawn page arrows. */
+.icon-button::before {
+  content: none;
+}
+
+.toolbar-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#previous-page,
+#next-page {
+  width: 30px;
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+}
+
+#copy-file-url .toolbar-icon {
+  width: 19px;
+  height: 19px;
+  stroke-width: 1.9;
+}
+
 @media (max-width: 720px) {
   .toolbar {
     padding: 8px 8px 8px 42px;
@@ -48,11 +82,11 @@
     left: 8px;
   }
 
-  .search-control {
+  .search-tools {
     flex-basis: auto;
-    width: 120px;
+    width: 158px;
     margin-inline: 0;
-    padding-left: 8px;
+
   }
 }
 
@@ -63,7 +97,7 @@
     align-items: flex-start;
   }
 
-  .search-control {
+  .search-tools {
     top: 56px;
     left: 8px;
     width: calc(100% - 104px);
@@ -83,4 +117,16 @@
   .viewer {
     padding-top: 124px;
   }
+}
+
+.search-tools .search-control {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+  margin-inline: 0;
+}
+
+#copy-file-url {
+  flex: 0 0 30px;
+  color: var(--text);
 }
