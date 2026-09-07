@@ -1,4 +1,6 @@
 .toolbar {
+  --search-width: clamp(120px, calc(100vw - 780px), 460px);
+  --search-half-width: clamp(60px, calc(50vw - 390px), 230px);
   justify-content: flex-start;
   padding-left: 50px;
 }
@@ -17,10 +19,19 @@
   left: 50%;
   z-index: 1;
   flex: none;
-  width: clamp(120px, calc(100vw - 780px), 460px);
+  width: var(--search-width);
   min-width: 120px;
   margin-inline: 0;
   transform: translateX(-50%);
+}
+
+.search-actions {
+  position: absolute;
+  top: 8px;
+  left: calc(50% + var(--search-half-width) + 8px);
+  z-index: 1;
+  display: flex;
+  gap: 4px;
 }
 
 .spacer {
@@ -55,8 +66,14 @@
   .search-control {
     top: 56px;
     left: 8px;
-    width: calc(100% - 16px);
+    width: calc(100% - 104px);
     transform: none;
+  }
+
+  .search-actions {
+    top: 56px;
+    right: 8px;
+    left: auto;
   }
 
   body .minimap {
