@@ -73,6 +73,12 @@
   stroke-width: 1.9;
 }
 
+.zoom-control .zoom-level {
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
 @media (max-width: 720px) {
   .toolbar {
     padding: 8px 8px 8px 42px;
