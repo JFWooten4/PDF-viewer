@@ -4,6 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../src/minimap.js', import.meta.url), 'utf8');
+const styles = readFileSync(new URL('../src/minimap.css', import.meta.url), 'utf8');
 function fixture(count, height = 900) {
   const window = { innerHeight: height, scrollY: 0, addEventListener() {},
     scrollTo({ top }) { this.scrollY = top; } };
@@ -44,14 +45,27 @@ test('minimap packs page thumbnails without viewer gaps', () => {
   assert.equal(parseFloat(f.tiles[2].style.top), 224);
 });
 
-test('long documents retain page scale and expose the final page at the bottom', () => {
+test('long documents compress every page into the visible minimap track', () => {
   const f = fixture(100);
+  const first = f.tiles[0];
+  const last = f.tiles.at(-1);
+  const lastBottom = parseFloat(last.style.top) + parseFloat(last.style.height);
+  assert.equal(parseFloat(first.style.top), 0);
+  assert.ok(parseFloat(first.style.height) < 112);
+  assert.ok(Math.abs(lastBottom - f.track.clientHeight) < 0.00001);
+
   f.window.scrollY = 142000 - f.window.innerHeight;
   f.sync();
+  assert.equal(parseFloat(first.style.top), 0);
+  assert.ok(Math.abs(parseFloat(last.style.top) + parseFloat(last.style.height) - f.track.clientHeight) < 0.00001);
+});
+
+test('very long documents allow subpixel page bands instead of overflowing the track', () => {
+  const f = fixture(2000);
   const last = f.tiles.at(-1);
-  assert.equal(parseFloat(last.style.height), 112);
-  assert.ok(parseFloat(last.style.top) >= 0);
-  assert.ok(parseFloat(last.style.top) + 112 <= f.track.clientHeight);
+  assert.ok(parseFloat(f.tiles[0].style.height) < 1);
+  assert.ok(parseFloat(last.style.top) + parseFloat(last.style.height) <= f.track.clientHeight + 0.00001);
+  assert.match(styles, /\.minimap-page\s*\{[\s\S]*?min-height:\s*0;/);
 });
 
 test('dragging to the end reaches the document end for short and long maps', () => {

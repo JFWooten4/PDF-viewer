@@ -90,22 +90,25 @@ function syncMinimap() {
   const trackHeight = minimap.clientHeight;
   const { scrollMaximum } = documentMetrics();
 
-  // Keep page thumbnails contiguous even when the full viewer separates pages.
+  // Keep page thumbnails contiguous and compress long documents to the available track height.
   const pageWidth = pages[0]?.getBoundingClientRect().width || 1;
   const thumbnailWidth = tiles[0]?.clientWidth || 80;
-  const scale = thumbnailWidth / pageWidth;
-  const tileHeights = pages.map((page) => Math.max(1, page.getBoundingClientRect().height * scale));
+  const widthScale = thumbnailWidth / pageWidth;
+  const widthScaledHeights = pages.map((page) => page.getBoundingClientRect().height * widthScale);
+  const widthScaledHeight = widthScaledHeights.reduce((total, height) => total + height, 0);
+  const heightCompression = widthScaledHeight > trackHeight ? trackHeight / widthScaledHeight : 1;
+  const scale = widthScale * heightCompression;
+  const tileHeights = pages.map((page) => page.getBoundingClientRect().height * scale);
   const contentHeight = tileHeights.reduce((total, height) => total + height, 0);
   mapHeight = Math.min(trackHeight, contentHeight);
   const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
-  const mapOffset = scrollRatio * Math.max(contentHeight - trackHeight, 0);
 
   let packedTop = 0;
   pages.forEach((page, index) => {
     const tile = tiles[index];
     const tileHeight = tileHeights[index];
 
-    tile.style.top = `${packedTop - mapOffset}px`;
+    tile.style.top = `${packedTop}px`;
     tile.style.height = `${tileHeight}px`;
     packedTop += tileHeight;
     syncThumbnail(page, tile);

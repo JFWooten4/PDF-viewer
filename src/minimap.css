@@ -49,7 +49,7 @@
   position: absolute;
   right: 8px;
   left: 8px;
-  min-height: 1px;
+  min-height: 0;
   overflow: hidden;
   background: var(--page-bg);
   opacity: 0.82;
