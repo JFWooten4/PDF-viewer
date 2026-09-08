@@ -308,6 +308,12 @@ input {
   line-height: 1;
 }
 
+.section-copy img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
 .section-copy:hover,
 .section-copy:focus-visible {
   outline: 0;

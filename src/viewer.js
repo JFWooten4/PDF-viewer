@@ -45,13 +45,9 @@ const source = params.get("url");
 const THEME_STORAGE_KEY = "pdf-viewer-theme";
 const LUNA_ICON = extensionAssetUrl("src/assets/luna-mark.png", "assets/luna-mark.png");
 const CELESTIA_ICON = extensionAssetUrl("src/assets/celestia-mark.png", "assets/celestia-mark.png");
-const DARK_MODE_SHARE_ICON = extensionAssetUrl(
-  "src/assets/copy-page-icon.png",
-  "assets/copy-page-icon.png",
-);
-const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
-  "src/assets/copy-page-icon-light.png",
-  "assets/copy-page-icon-light.png",
+const COPY_ICON = extensionAssetUrl(
+  "src/assets/pinkie-mirror.png",
+  "assets/pinkie-mirror.png",
 );
 const SCANNED_PAGE_IMAGE_AREA_THRESHOLD = 0.8;
 
@@ -462,7 +458,11 @@ function createOutlineList(items, parentReference = "") {
     const copyButton = document.createElement("button");
     copyButton.type = "button";
     copyButton.className = "section-copy";
-    copyButton.textContent = "⧉";
+    const copyIcon = document.createElement("img");
+    copyIcon.src = COPY_ICON;
+    copyIcon.alt = "";
+    copyIcon.setAttribute("aria-hidden", "true");
+    copyButton.append(copyIcon);
     copyButton.title = `Copy section reference ${copyText}`;
     copyButton.setAttribute("aria-label", copyButton.title);
     copyButton.addEventListener("click", () => void copySectionReference(copyText));
@@ -538,7 +538,7 @@ function setTheme(theme) {
   const isDark = nextTheme === "dark";
   themeIcon.classList.toggle("celestia-icon", isDark);
   themeIcon.src = isDark ? CELESTIA_ICON : LUNA_ICON;
-  shareIcon.src = isDark ? DARK_MODE_SHARE_ICON : LIGHT_MODE_SHARE_ICON;
+  shareIcon.src = COPY_ICON;
   themeButton.title = isDark ? "Switch to light mode" : "Switch to dark mode";
   themeButton.setAttribute("aria-label", themeButton.title);
 
