@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --page-filter: invert(0.94) hue-rotate(180deg);
+  --page-filter: invert(1) hue-rotate(180deg);
   --body-bg: #000000;
   --text: #f3f4f6;
   --muted: #b8b8bd;
@@ -10,6 +10,7 @@
   --control-bg: #242427;
   --control-hover: #303034;
   --page-bg: #000000;
+  --page-border: #43af49;
   --placeholder: #5b5b60;
   --toast-bg: #202023;
   --search-bg: #1d1d20;
@@ -492,13 +493,7 @@ input {
 }
 
 .page.rendered {
-  box-shadow:
-    0 0 0 1px rgb(255 255 255 / 10%),
-    0 0 10px rgb(255 255 255 / 6%);
-}
-
-:root[data-theme="light"] .page.rendered {
-  box-shadow: none;
+  box-shadow: 0 0 0 1px var(--page-border);
 }
 
 .page canvas {
