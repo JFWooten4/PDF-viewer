@@ -1,14 +1,9 @@
 const viewer = document.querySelector("#viewer");
-const searchInput = document.querySelector("#search-input");
 const searchCount = document.querySelector("#search-count");
 const ARROW_CLASS = "search-line-arrow";
 const ACTIVE_CLASS = "search-highlight-active";
 
 let arrowFrame;
-let previousPosition;
-let previousTotal;
-let activePageNumber;
-let activeOrdinal = 0;
 
 function parseSearchPosition() {
   const match = searchCount.textContent.match(/^\s*(\d+)\s*\/\s*(\d+)\s*$/);
@@ -35,52 +30,20 @@ function removeSearchCues() {
   }
 }
 
-function searchDirection(position, total) {
-  if (previousPosition === undefined || previousTotal !== total) {
-    return 0;
-  }
-
-  if (position === (previousPosition % total) + 1) {
-    return 1;
-  }
-
-  if (position === ((previousPosition - 2 + total) % total) + 1) {
-    return -1;
-  }
-
-  return 0;
-}
-
 function refreshActiveSearchCue() {
   arrowFrame = undefined;
 
   const searchPosition = parseSearchPosition();
   const page = viewer.querySelector(".page.search-match-page");
   const highlights = page ? [...page.querySelectorAll(".search-highlight")] : [];
-  const pageNumber = Number.parseInt(page?.dataset.page ?? "", 10);
-  const direction = searchPosition
-    ? searchDirection(searchPosition.position, searchPosition.total)
-    : 0;
+  const activeOrdinal = Number.parseInt(page?.dataset.searchMatchOrdinal ?? "", 10);
 
   removeSearchCues();
 
-  if (!searchPosition || !page || !highlights.length || Number.isNaN(pageNumber)) {
+  if (!searchPosition || !page || !highlights[activeOrdinal]) {
     return;
   }
 
-  if (activePageNumber === pageNumber) {
-    if (direction === 1) {
-      activeOrdinal = (activeOrdinal + 1) % highlights.length;
-    } else if (direction === -1) {
-      activeOrdinal = (activeOrdinal - 1 + highlights.length) % highlights.length;
-    } else if (previousPosition !== searchPosition.position) {
-      activeOrdinal = 0;
-    }
-  } else {
-    activeOrdinal = direction === -1 ? highlights.length - 1 : 0;
-  }
-
-  activeOrdinal = Math.min(activeOrdinal, highlights.length - 1);
   const activeHighlight = highlights[activeOrdinal];
   activeHighlight.classList.add(ACTIVE_CLASS);
 
@@ -93,10 +56,6 @@ function refreshActiveSearchCue() {
     arrow.setAttribute("aria-hidden", "true");
     page.append(arrow);
   }
-
-  previousPosition = searchPosition.position;
-  previousTotal = searchPosition.total;
-  activePageNumber = pageNumber;
 }
 
 function scheduleSearchCueRefresh() {
@@ -105,14 +64,6 @@ function scheduleSearchCueRefresh() {
   }
 
   arrowFrame = requestAnimationFrame(refreshActiveSearchCue);
-}
-
-function resetSearchCueTracking() {
-  previousPosition = undefined;
-  previousTotal = undefined;
-  activePageNumber = undefined;
-  activeOrdinal = 0;
-  scheduleSearchCueRefresh();
 }
 
 function nodeContainsSearchHighlight(node) {
@@ -147,7 +98,7 @@ const viewerObserver = new MutationObserver((mutations) => {
 
 viewerObserver.observe(viewer, {
   attributes: true,
-  attributeFilter: ["class"],
+  attributeFilter: ["class", "data-search-match-ordinal"],
   childList: true,
   subtree: true,
 });
@@ -155,6 +106,5 @@ viewerObserver.observe(viewer, {
 const countObserver = new MutationObserver(scheduleSearchCueRefresh);
 countObserver.observe(searchCount, { childList: true, characterData: true, subtree: true });
 
-searchInput.addEventListener("input", resetSearchCueTracking);
 window.addEventListener("resize", scheduleSearchCueRefresh);
 scheduleSearchCueRefresh();
