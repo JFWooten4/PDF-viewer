@@ -285,7 +285,7 @@ function outlineHasDestination(items) {
 
 function sectionReferenceFromTitle(title) {
   const match = title.match(
-    /^((?:[IVXLCDM]+|[A-Z]|\d+|[a-z])(?:\.(?:[IVXLCDM]+|[A-Z]|\d+|[a-z]))*)\.?(?=\s|$)/,
+    /^((?:[IVXLCDM]+|[A-Z]|\d+|[a-z])(?:\.(?:[IVXLCDM]+|[A-Z]|\d+|[a-z]))*)[.)]?(?=\s|$)/,
   );
   return match?.[1] || "";
 }
