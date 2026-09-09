@@ -462,7 +462,16 @@ function createOutlineList(items, parentReference = "") {
     const copyButton = document.createElement("button");
     copyButton.type = "button";
     copyButton.className = "section-copy";
-    copyButton.textContent = "⧉";
+    const copyIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    copyIcon.classList.add("toolbar-icon");
+    copyIcon.setAttribute("viewBox", "0 0 24 24");
+    copyIcon.setAttribute("aria-hidden", "true");
+    for (const data of ["M9 17H7a5 5 0 0 1 0-10h3", "M15 7h2a5 5 0 1 1 0 10h-3", "M8 12h8"]) {
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", data);
+      copyIcon.append(path);
+    }
+    copyButton.append(copyIcon);
     copyButton.title = `Copy section reference ${copyText}`;
     copyButton.setAttribute("aria-label", copyButton.title);
     copyButton.addEventListener("click", () => void copySectionReference(copyText));

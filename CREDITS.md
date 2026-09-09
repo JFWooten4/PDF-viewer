@@ -13,3 +13,7 @@ https://www.teepublic.com/poster-and-art/541555-mlp-cutie-mark-rainbow-special-p
 The extension packages the mark with a transparent background.
 
 All upstream artwork remains subject to its original rights and licensing terms. This file documents provenance and attribution only.
+
+## Pinkie Pie and Sweetie Bot
+
+The copy-action artwork (`src/assets/pinkie-mirror.png`) depicts Pinkie Pie looking into a mirror. The ChatGPT button artwork (`src/assets/sweetie-bot.png`) depicts Sweetie Bot, a robot interpretation of Sweetie Belle. Both images were generated with OpenAI image generation for this extension.
