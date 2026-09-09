@@ -97,7 +97,7 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.1;
 
-let zoomMode = "fit-width";
+let zoomMode = "custom";
 let zoomScale = 1;
 let zoomRenderTimer;
 let zoomResizeTimer;
@@ -294,7 +294,7 @@ function createZoomControls() {
   fitWidthButton.innerHTML = fitWidthIcon();
   fitWidthButton.title = "Fit page width to viewport";
   fitWidthButton.setAttribute("aria-label", "Fit page width to viewport");
-  fitWidthButton.setAttribute("aria-pressed", "true");
+  fitWidthButton.setAttribute("aria-pressed", "false");
 
   control.append(
     fitHeightButton,
