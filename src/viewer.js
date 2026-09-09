@@ -844,7 +844,10 @@ function showSearchMatch(index, behavior = "smooth") {
 
   clearSearchPageMarker();
   const pageElement = pageElements[match.pageNumber - 1];
-  pageElement?.classList.add("search-match-page");
+  if (pageElement) {
+    pageElement.dataset.searchMatchOrdinal = String(match.ordinal);
+    pageElement.classList.add("search-match-page");
+  }
 
   goToPage(match.pageNumber, behavior);
   void queuePageRender(match.pageNumber, true).then(() => refreshSearchHighlights());
@@ -876,13 +879,14 @@ async function runSearch(rawQuery) {
     }
 
     let offset = 0;
+    let ordinal = 0;
     while (offset <= pageText.length - query.length) {
       const matchOffset = pageText.indexOf(query, offset);
       if (matchOffset === -1) {
         break;
       }
 
-      matches.push({ pageNumber, offset: matchOffset });
+      matches.push({ pageNumber, offset: matchOffset, ordinal: ordinal++ });
       offset = matchOffset + Math.max(query.length, 1);
     }
   }

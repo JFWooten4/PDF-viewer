@@ -1,58 +1,69 @@
 const viewer = document.querySelector("#viewer");
+const searchCount = document.querySelector("#search-count");
 const ARROW_CLASS = "search-line-arrow";
+const ACTIVE_CLASS = "search-highlight-active";
 
 let arrowFrame;
 
-function refreshPageArrows(page) {
-  for (const arrow of page.querySelectorAll(`:scope > .${ARROW_CLASS}`)) {
-    arrow.remove();
+function parseSearchPosition() {
+  const match = searchCount.textContent.match(/^\s*(\d+)\s*\/\s*(\d+)\s*$/);
+  if (!match) {
+    return null;
   }
 
-  const highlights = [...page.querySelectorAll(".search-highlight")];
-  if (!highlights.length) {
+  const position = Number.parseInt(match[1], 10);
+  const total = Number.parseInt(match[2], 10);
+  if (position < 1 || total < 1 || position > total) {
+    return null;
+  }
+
+  return { position, total };
+}
+
+function removeSearchCues() {
+  for (const highlight of viewer.querySelectorAll(`.${ACTIVE_CLASS}`)) {
+    highlight.classList.remove(ACTIVE_CLASS);
+  }
+
+  for (const arrow of viewer.querySelectorAll(`.${ARROW_CLASS}`)) {
+    arrow.remove();
+  }
+}
+
+function refreshActiveSearchCue() {
+  arrowFrame = undefined;
+
+  const searchPosition = parseSearchPosition();
+  const page = viewer.querySelector(".page.search-match-page");
+  const highlights = page ? [...page.querySelectorAll(".search-highlight")] : [];
+  const activeOrdinal = Number.parseInt(page?.dataset.searchMatchOrdinal ?? "", 10);
+
+  removeSearchCues();
+
+  if (!searchPosition || !page || !highlights[activeOrdinal]) {
     return;
   }
 
+  const activeHighlight = highlights[activeOrdinal];
+  activeHighlight.classList.add(ACTIVE_CLASS);
+
   const pageRect = page.getBoundingClientRect();
-  const lineCenters = [];
-
-  for (const highlight of highlights) {
-    const rect = highlight.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) {
-      continue;
-    }
-
-    const centerY = rect.top - pageRect.top + rect.height / 2;
-    const sameLine = lineCenters.some(
-      (existingCenter) => Math.abs(existingCenter - centerY) <= Math.max(2, rect.height * 0.35),
-    );
-
-    if (sameLine) {
-      continue;
-    }
-
-    lineCenters.push(centerY);
+  const rect = activeHighlight.getBoundingClientRect();
+  if (rect.width > 0 && rect.height > 0) {
     const arrow = document.createElement("span");
     arrow.className = ARROW_CLASS;
-    arrow.style.top = `${centerY}px`;
+    arrow.style.top = `${rect.top - pageRect.top + rect.height / 2}px`;
     arrow.setAttribute("aria-hidden", "true");
     page.append(arrow);
   }
 }
 
-function refreshSearchLineArrows() {
-  arrowFrame = undefined;
-  for (const page of viewer.querySelectorAll(".page")) {
-    refreshPageArrows(page);
-  }
-}
-
-function scheduleSearchLineArrowRefresh() {
+function scheduleSearchCueRefresh() {
   if (arrowFrame) {
     return;
   }
 
-  arrowFrame = requestAnimationFrame(refreshSearchLineArrows);
+  arrowFrame = requestAnimationFrame(refreshActiveSearchCue);
 }
 
 function nodeContainsSearchHighlight(node) {
@@ -63,8 +74,12 @@ function nodeContainsSearchHighlight(node) {
   );
 }
 
-const observer = new MutationObserver((mutations) => {
-  const searchHighlightsChanged = mutations.some((mutation) => {
+const viewerObserver = new MutationObserver((mutations) => {
+  const searchCueChanged = mutations.some((mutation) => {
+    if (mutation.type === "attributes") {
+      return mutation.target instanceof Element && mutation.target.matches(".page");
+    }
+
     if (mutation.type !== "childList") {
       return false;
     }
@@ -76,11 +91,20 @@ const observer = new MutationObserver((mutations) => {
     return [...mutation.addedNodes, ...mutation.removedNodes].some(nodeContainsSearchHighlight);
   });
 
-  if (searchHighlightsChanged) {
-    scheduleSearchLineArrowRefresh();
+  if (searchCueChanged) {
+    scheduleSearchCueRefresh();
   }
 });
 
-observer.observe(viewer, { childList: true, subtree: true });
-window.addEventListener("resize", scheduleSearchLineArrowRefresh);
-scheduleSearchLineArrowRefresh();
+viewerObserver.observe(viewer, {
+  attributes: true,
+  attributeFilter: ["class", "data-search-match-ordinal"],
+  childList: true,
+  subtree: true,
+});
+
+const countObserver = new MutationObserver(scheduleSearchCueRefresh);
+countObserver.observe(searchCount, { childList: true, characterData: true, subtree: true });
+
+window.addEventListener("resize", scheduleSearchCueRefresh);
+scheduleSearchCueRefresh();
