@@ -167,8 +167,8 @@
 
 .search-control input::-webkit-search-cancel-button {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   margin-left: 4px;
   background:
     linear-gradient(45deg, transparent 43%, var(--search-text) 43% 57%, transparent 57%),
