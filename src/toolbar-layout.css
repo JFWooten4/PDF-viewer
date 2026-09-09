@@ -126,6 +126,23 @@
   margin-inline: 0;
 }
 
+.search-control input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  background:
+    linear-gradient(45deg, transparent 43%, var(--search-text) 43% 57%, transparent 57%),
+    linear-gradient(-45deg, transparent 43%, var(--search-text) 43% 57%, transparent 57%);
+  cursor: pointer;
+  filter: none;
+  opacity: 0.82;
+}
+
+.search-control input::-webkit-search-cancel-button:hover {
+  opacity: 1;
+}
+
 #copy-file-url {
   flex: 0 0 30px;
   color: var(--text);
