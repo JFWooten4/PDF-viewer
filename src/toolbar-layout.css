@@ -1,6 +1,8 @@
 .toolbar {
   --search-width: clamp(158px, calc(100vw - 902px), 498px);
   --search-half-width: clamp(79px, calc(50vw - 451px), 249px);
+  --document-action-gap: clamp(6px, 0.7vw, 12px);
+  --document-actions-left: calc(50% + var(--search-half-width) + 8px);
   justify-content: flex-start;
   padding-left: 50px;
 }
@@ -31,10 +33,30 @@
 .search-actions {
   position: absolute;
   top: 8px;
-  left: calc(50% + var(--search-half-width) + 8px);
+  left: var(--document-actions-left);
   z-index: 1;
   display: flex;
   gap: 4px;
+}
+
+#theme-toggle,
+#share-page,
+.tools {
+  position: absolute;
+  top: 8px;
+  z-index: 2;
+}
+
+#theme-toggle {
+  left: calc(var(--document-actions-left) + 64px + var(--document-action-gap));
+}
+
+#share-page {
+  left: calc(var(--document-actions-left) + 98px + var(--document-action-gap));
+}
+
+.tools {
+  left: calc(var(--document-actions-left) + 132px + var(--document-action-gap));
 }
 
 .spacer {
@@ -107,6 +129,17 @@
   .search-actions {
     top: 56px;
     right: 8px;
+    left: auto;
+  }
+
+  #theme-toggle,
+  #share-page {
+    position: static;
+  }
+
+  .tools {
+    position: relative;
+    top: auto;
     left: auto;
   }
 
