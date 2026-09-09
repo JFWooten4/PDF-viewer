@@ -1,8 +1,6 @@
 .toolbar {
   --search-width: clamp(158px, calc(100vw - 902px), 498px);
-  --search-half-width: clamp(79px, calc(50vw - 451px), 249px);
   --document-action-gap: clamp(6px, 0.7vw, 12px);
-  --document-actions-left: calc(50% + var(--search-half-width) + 8px);
   justify-content: flex-start;
   padding-left: 50px;
 }
@@ -33,7 +31,8 @@
 .search-actions {
   position: absolute;
   top: 8px;
-  left: var(--document-actions-left);
+  right: calc(110px + var(--document-action-gap));
+  left: auto;
   z-index: 1;
   display: flex;
   gap: 4px;
@@ -48,15 +47,18 @@
 }
 
 #theme-toggle {
-  left: calc(var(--document-actions-left) + 64px + var(--document-action-gap));
+  right: 80px;
+  left: auto;
 }
 
 #share-page {
-  left: calc(var(--document-actions-left) + 98px + var(--document-action-gap));
+  right: 46px;
+  left: auto;
 }
 
 .tools {
-  left: calc(var(--document-actions-left) + 132px + var(--document-action-gap));
+  right: 12px;
+  left: auto;
 }
 
 .spacer {
@@ -103,6 +105,7 @@
 
 @media (max-width: 720px) {
   .toolbar {
+    gap: 3px;
     padding: 8px 8px 8px 42px;
   }
 
@@ -146,6 +149,7 @@
   .tools {
     position: relative;
     top: auto;
+    right: auto;
     left: auto;
   }
 
