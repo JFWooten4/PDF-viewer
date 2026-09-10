@@ -323,7 +323,13 @@ function fitWidthBase() {
 }
 
 function viewportPageWidth() {
-  return Math.max(160, window.innerWidth - PAGE_HORIZONTAL_GUTTER);
+  const minimapLeft = document.querySelector("#minimap")?.getBoundingClientRect().left;
+  const viewportRight =
+    Number.isFinite(minimapLeft) && minimapLeft > 0
+      ? Math.min(window.innerWidth, minimapLeft)
+      : window.innerWidth;
+
+  return Math.max(160, viewportRight - PAGE_HORIZONTAL_GUTTER);
 }
 
 function viewportPageHeight() {
