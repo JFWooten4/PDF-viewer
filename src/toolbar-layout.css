@@ -1,3 +1,4 @@
+/* The row cutoff is controlled by TOOLBAR_ROW_BREAKPOINT in toolbar-layout.js. */
 .toolbar {
   --search-width: clamp(158px, calc(100vw - 902px), 498px);
   --section-gap: 56px;
@@ -66,7 +67,7 @@
   min-width: 0;
 }
 
-@media (min-width: 1061px) {
+:where(:root:not(.toolbar-two-rows)) {
   .search-tools {
     position: static;
     flex: 1 1 auto;
@@ -187,7 +188,7 @@
 }
 
 /* Give search its own row when the navigation controls need more room. */
-@media (max-width: 1060px) {
+:where(:root.toolbar-two-rows) {
   .toolbar {
     height: 100px;
     align-items: flex-start;
@@ -260,7 +261,7 @@
   z-index: 2;
 }
 
-@media (max-width: 1130px) and (min-width: 1061px) {
-  .search-control input { min-width: 0; }
-  .search-count { display: none; }
+@media (max-width: 1130px) {
+  :where(:root:not(.toolbar-two-rows)) .search-control input { min-width: 0; }
+  :where(:root:not(.toolbar-two-rows)) .search-count { display: none; }
 }
