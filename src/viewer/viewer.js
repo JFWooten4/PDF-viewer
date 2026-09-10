@@ -29,6 +29,8 @@ const sectionToggle = document.querySelector("#section-toggle");
 const sectionPopover = document.querySelector("#section-popover");
 const sectionDocumentTitle = document.querySelector("#section-document-title");
 const sectionList = document.querySelector("#section-list");
+const sectionMetadata = document.querySelector("#section-metadata");
+const sectionMetadataList = document.querySelector("#section-metadata-list");
 const themeButton = document.querySelector("#theme-toggle");
 const themeIcon = document.querySelector("#theme-icon");
 const tools = document.querySelector("#tools");
@@ -54,6 +56,15 @@ const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
   "assets/copy-page-icon-light.png",
 );
 const SCANNED_PAGE_IMAGE_AREA_THRESHOLD = 0.8;
+const PDF_METADATA_FIELDS = [
+  ["Author", "Author", "dc:creator"],
+  ["Subject", "Subject", "dc:description"],
+  ["Keywords", "Keywords", "pdf:keywords"],
+  ["Creator", "Creator", "xmp:creatortool"],
+  ["Producer", "Producer", "pdf:producer"],
+  ["Created", "CreationDate", "xmp:createdate"],
+  ["Modified", "ModDate", "xmp:modifydate"],
+];
 
 let pdfDocument;
 let pdfLinkService;
@@ -489,19 +500,57 @@ function createOutlineList(items, parentReference = "") {
   return list;
 }
 
-async function getPdfMetadataTitle() {
+function metadataText(value) {
+  if (Array.isArray(value)) {
+    return value.map(metadataText).filter(Boolean).join(", ");
+  }
+
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return "";
+}
+
+function metadataValue(info, metadata, infoKey, xmpKey) {
+  const infoValue = metadataText(info?.[infoKey]);
+  return infoValue || metadataText(metadata?.get?.(xmpKey));
+}
+
+function renderPdfMetadata(entries) {
+  const fragment = document.createDocumentFragment();
+
+  for (const { label, value } of entries) {
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+    row.className = "section-metadata-row";
+    term.textContent = label;
+    description.textContent = value;
+    row.append(term, description);
+    fragment.append(row);
+  }
+
+  sectionMetadataList.replaceChildren(fragment);
+  sectionMetadata.hidden = entries.length === 0;
+}
+
+async function getPdfMetadataDetails() {
   try {
     const { info, metadata } = await pdfDocument.getMetadata();
-    const infoTitle = typeof info?.Title === "string" ? info.Title.trim() : "";
+    const title = metadataValue(info, metadata, "Title", "dc:title");
+    const entries = PDF_METADATA_FIELDS.map(([label, infoKey, xmpKey]) => ({
+      label,
+      value: metadataValue(info, metadata, infoKey, xmpKey),
+    })).filter(({ value }) => Boolean(value));
 
-    if (infoTitle) {
-      return infoTitle;
-    }
-
-    const xmpTitle = metadata?.get?.("dc:title");
-    return typeof xmpTitle === "string" ? xmpTitle.trim() : "";
+    return { title, entries };
   } catch {
-    return "";
+    return { title: "", entries: [] };
   }
 }
 
@@ -524,11 +573,12 @@ async function initializeSectionNavigation() {
     return;
   }
 
-  const metadataTitle = await getPdfMetadataTitle();
+  const { title: metadataTitle, entries: metadataEntries } = await getPdfMetadataDetails();
   if (metadataTitle) {
     sectionDocumentTitle.textContent = metadataTitle;
     sectionDocumentTitle.hidden = false;
   }
+  renderPdfMetadata(metadataEntries);
 
   sectionList.replaceChildren(outlineList);
   sectionNav.hidden = false;
