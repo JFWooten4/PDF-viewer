@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../src/minimap.js', import.meta.url), 'utf8');
-const styles = readFileSync(new URL('../src/minimap.css', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/viewer/navigation/minimap.js', import.meta.url), 'utf8');
+const styles = readFileSync(new URL('../src/viewer/navigation/minimap.css', import.meta.url), 'utf8');
 function fixture(count, height = 900) {
   const window = { innerHeight: height, scrollY: 0, addEventListener() {},
     scrollTo({ top }) { this.scrollY = top; } };

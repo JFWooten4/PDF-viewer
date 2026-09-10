@@ -11,12 +11,12 @@
   "content_scripts": [
     {
       "matches": ["https://www.sec.gov/comments/*"],
-      "js": ["src/sec-comment.js"],
+      "js": ["src/content/sec-comment.js"],
       "run_at": "document_start"
     },
     {
       "matches": ["https://chatgpt.com/*"],
-      "js": ["src/chatgpt-summary.js"],
+      "js": ["src/content/chatgpt-summary.js"],
       "run_at": "document_idle"
     }
   ],

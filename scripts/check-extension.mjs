@@ -43,6 +43,16 @@ async function validateManifest(path, expected) {
   }
   await requireFile(join(root, pdfHandler.handler_url), `${path} PDF handler`);
 
+  const viewerHtml = await readFile(join(root, pdfHandler.handler_url), "utf8");
+  for (const [, asset] of viewerHtml.matchAll(/(?:src|href)="([^"]+)"/g)) {
+    await requireFile(join(root, dirname(pdfHandler.handler_url), asset), `${path} viewer asset`);
+  }
+  for (const contentScript of manifest.content_scripts || []) {
+    for (const asset of [...(contentScript.js || []), ...(contentScript.css || [])]) {
+      await requireFile(join(root, asset), `${path} content script asset`);
+    }
+  }
+
   return manifest;
 }
 
@@ -57,12 +67,12 @@ await validateManifest("dist/manifest.json", {
 });
 
 for (const path of [
-  "dist/viewer.js",
-  "dist/viewer.css",
-  "dist/summarize-with-chatgpt.js",
-  "dist/chatgpt-summary.js",
-  "dist/qr-file-url.js",
-  "dist/qr-file-url.css",
+  "dist/viewer/viewer.js",
+  "dist/viewer/viewer.css",
+  "dist/viewer/sharing/summarize-with-chatgpt.js",
+  "dist/content/chatgpt-summary.js",
+  "dist/viewer/sharing/qr-file-url.js",
+  "dist/viewer/sharing/qr-file-url.css",
   "dist/pdf.worker.min.mjs",
   "dist/cmaps",
   "dist/standard_fonts",
@@ -71,15 +81,15 @@ for (const path of [
   await requireFile(path);
 }
 
-const sourceViewer = await readFile("src/viewer.js", "utf8");
+const sourceViewer = await readFile("src/viewer/viewer.js", "utf8");
 const sourceBackground = await readFile("src/background.js", "utf8");
-const builtViewer = await readFile("dist/viewer.js", "utf8");
+const builtViewer = await readFile("dist/viewer/viewer.js", "utf8");
 
 if (!sourceViewer.includes("chrome.mimeHandler.getStreamInfo")) {
-  fail("src/viewer.js must consume the intercepted PDF stream with chrome.mimeHandler.getStreamInfo()");
+  fail("src/viewer/viewer.js must consume the intercepted PDF stream with chrome.mimeHandler.getStreamInfo()");
 }
 if (!builtViewer.includes("mimeHandler.getStreamInfo")) {
-  fail("dist/viewer.js lost the MIME-handler stream code during bundling");
+  fail("dist/viewer/viewer.js lost the MIME-handler stream code during bundling");
 }
 if (!sourceBackground.includes("chrome.mimeHandler")) {
   fail("src/background.js must feature-detect chrome.mimeHandler before using the redirect fallback");

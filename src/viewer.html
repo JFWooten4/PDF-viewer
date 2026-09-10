@@ -4,14 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PDF Viewer</title>
-    <link rel="stylesheet" href="viewer.css" />
-    <link rel="stylesheet" href="text-selection.css" />
-    <link rel="stylesheet" href="search-highlight-cues.css" />
-    <link rel="stylesheet" href="toolbar-layout.css" />
-    <link rel="stylesheet" href="minimap.css" />
-    <link rel="stylesheet" href="image-color-toggle.css" />
-    <link rel="stylesheet" href="qr-file-url.css" />
-    <link rel="stylesheet" href="annotation-layer.css" />
+    <link rel="stylesheet" href="viewer/viewer.css" />
+    <link rel="stylesheet" href="viewer/selection/text-selection.css" />
+    <link rel="stylesheet" href="viewer/search/search-highlight-cues.css" />
+    <link rel="stylesheet" href="viewer/navigation/toolbar-layout.css" />
+    <link rel="stylesheet" href="viewer/navigation/minimap.css" />
+    <link rel="stylesheet" href="viewer/theme/image-color-toggle.css" />
+    <link rel="stylesheet" href="viewer/sharing/qr-file-url.css" />
+    <link rel="stylesheet" href="viewer/annotation-layer.css" />
   </head>
   <body>
     <header class="toolbar" aria-label="PDF controls">
@@ -137,17 +137,17 @@
       </div>
     </dialog>
 
-    <script src="toolbar-layout.js"></script>
-    <script src="network-fallback.js"></script>
-    <script type="module" src="image-color-toggle.js"></script>
-    <script type="module" src="viewer.js"></script>
-    <script type="module" src="text-selection.js"></script>
-    <script type="module" src="search-highlight-cues.js"></script>
-    <script type="module" src="minimap.js"></script>
-    <script type="module" src="copy-file-url.js"></script>
-    <script type="module" src="summarize-with-chatgpt.js"></script>
-    <script type="module" src="qr-file-url.js"></script>
-    <script type="module" src="viewer-settings.js"></script>
-    <script type="module" src="close-tab-shortcut.js"></script>
+    <script src="viewer/navigation/toolbar-layout.js"></script>
+    <script src="viewer/network-fallback.js"></script>
+    <script type="module" src="viewer/theme/image-color-toggle.js"></script>
+    <script type="module" src="viewer/viewer.js"></script>
+    <script type="module" src="viewer/selection/text-selection.js"></script>
+    <script type="module" src="viewer/search/search-highlight-cues.js"></script>
+    <script type="module" src="viewer/navigation/minimap.js"></script>
+    <script type="module" src="viewer/sharing/copy-file-url.js"></script>
+    <script type="module" src="viewer/sharing/summarize-with-chatgpt.js"></script>
+    <script type="module" src="viewer/sharing/qr-file-url.js"></script>
+    <script type="module" src="viewer/viewer-settings.js"></script>
+    <script type="module" src="viewer/close-tab-shortcut.js"></script>
   </body>
 </html>

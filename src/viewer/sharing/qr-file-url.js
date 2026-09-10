@@ -1,4 +1,4 @@
-import encodeQR from "../node_modules/qr/index.js";
+import encodeQR from "../../../node_modules/qr/index.js";
 
 const qrButton = document.querySelector("#qr-file-url");
 const qrDialog = document.querySelector("#qr-file-url-dialog");

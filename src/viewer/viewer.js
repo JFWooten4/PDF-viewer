@@ -1,5 +1,5 @@
-import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptions, TextLayer, VerbosityLevel } from "../node_modules/pdfjs-dist/build/pdf.mjs";
-import { EventBus, PDFLinkService } from "../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
+import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptions, TextLayer, VerbosityLevel } from "../../node_modules/pdfjs-dist/build/pdf.mjs";
+import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 
 const sourceMode = window.location.pathname.includes("/src/");
 

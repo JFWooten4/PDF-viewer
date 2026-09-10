@@ -41,6 +41,17 @@ npm run build
 
 The standalone unpacked extension is written to `dist/`. You can also select `dist/` with **Load unpacked** if you want the packaged build instead of the source tree.
 
+## Source layout
+
+- `src/background.js`: extension background worker.
+- `src/viewer.html`: viewer entry point; `src/loading-preview.html`: loading-state preview.
+- `src/viewer/`: PDF rendering, settings, networking, and viewer styles.
+- `src/viewer/navigation/`, `search/`, `selection/`, `sharing/`, and `theme/`: viewer features with their scripts and styles together.
+- `src/content/`: scripts injected into SEC and ChatGPT pages.
+- `src/assets/`: shared images and icons.
+
+The build preserves the source directory structure in `dist/`, bundles the viewer and QR modules, and adds the PDF.js runtime assets.
+
 ## Usage
 
 Open a PDF normally. On Chrome 151+, the extension renders the intercepted PDF stream in place while Chrome keeps the original document URL visible in the address bar. Scroll to a page and click the page-link icon to copy a link such as:
