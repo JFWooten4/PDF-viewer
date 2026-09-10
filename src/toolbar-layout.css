@@ -65,6 +65,41 @@
   min-width: 0;
 }
 
+@media (min-width: 1061px) {
+  .search-tools {
+    position: static;
+    margin-left: auto;
+    transform: none;
+  }
+
+  .search-actions {
+    position: static;
+    margin-right: auto;
+  }
+
+  .spacer {
+    display: none;
+  }
+
+  #theme-toggle,
+  #share-page {
+    position: static;
+    flex-shrink: 0;
+  }
+
+  .tools {
+    position: relative;
+    top: auto;
+    right: auto;
+    flex-shrink: 0;
+  }
+
+  #share-page,
+  .tools {
+    margin-left: -4px;
+  }
+}
+
 /* Use crisp SVG toolbar glyphs instead of tiny CSS-drawn page arrows. */
 .icon-button::before {
   content: none;
