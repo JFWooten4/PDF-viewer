@@ -68,12 +68,19 @@
 @media (min-width: 1061px) {
   .search-tools {
     position: static;
+    flex: 1 1 auto;
+    width: auto;
+    /* 640px search field, plus Pinkie, the inner gap, and section padding. */
+    max-width: calc(640px + 30px + 8px + 24px);
+    padding-left: 24px;
     margin-left: auto;
     transform: none;
   }
 
   .search-actions {
     position: static;
+    flex-shrink: 0;
+    padding-right: 24px;
     margin-right: auto;
   }
 
