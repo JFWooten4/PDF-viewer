@@ -307,6 +307,46 @@ input {
   color: #f3f4f6;
 }
 
+.section-metadata {
+  border-top: 1px solid #2d2d31;
+}
+
+.section-metadata-title {
+  padding: 11px 13px 9px;
+  border-bottom: 1px solid #2d2d31;
+  color: #a9a9af;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.section-metadata-list {
+  margin: 0;
+  padding: 6px 13px 10px;
+}
+
+.section-metadata-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.section-metadata-row dt {
+  color: #9d9da3;
+  font-weight: 600;
+}
+
+.section-metadata-row dd {
+  min-width: 0;
+  margin: 0;
+  color: #e7e7ea;
+  overflow-wrap: anywhere;
+}
+
 .page-control {
   display: flex;
   flex: 0 0 auto;
