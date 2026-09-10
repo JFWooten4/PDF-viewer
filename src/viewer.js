@@ -1,4 +1,4 @@
-import { AnnotationLayer, getDocument, GlobalWorkerOptions, TextLayer } from "../node_modules/pdfjs-dist/build/pdf.mjs";
+import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptions, TextLayer, VerbosityLevel } from "../node_modules/pdfjs-dist/build/pdf.mjs";
 import { EventBus, PDFLinkService } from "../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 
 const sourceMode = window.location.pathname.includes("/src/");
@@ -1142,7 +1142,11 @@ async function initialize() {
   const documentOptions = {
     cMapUrl: extensionAssetUrl("node_modules/pdfjs-dist/cmaps/", "cmaps/"),
     cMapPacked: true,
-    docBaseUrl: requestUrl.href,
+    // Local files and blob URLs cannot serve as PDF.js link-resolution bases.
+    docBaseUrl: createValidAbsoluteUrl(requestUrl.href)?.href,
+    // PDF.js recovers from missing fonts and malformed font hints internally.
+    // Keep actual failures visible without filling the extension's error log.
+    verbosity: VerbosityLevel.ERRORS,
     standardFontDataUrl: extensionAssetUrl(
       "node_modules/pdfjs-dist/standard_fonts/",
       "standard_fonts/",
