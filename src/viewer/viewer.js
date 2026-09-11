@@ -1039,7 +1039,7 @@ function bindControls() {
   downloadButton.addEventListener("click", () => void downloadPdf());
 
   pageNumberInput.addEventListener("change", () => {
-    goToPage(Number.parseInt(pageNumberInput.value, 10) || currentPage);
+    goToPage(Number.parseInt(pageNumberInput.value, 10) || currentPage, "auto");
   });
 
   pageNumberInput.addEventListener("keydown", (event) => {
