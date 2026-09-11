@@ -37,7 +37,7 @@
         </svg>
       </button>
       <label class="page-control" aria-label="Current page">
-        <input id="page-number" type="number" min="1" value="1" inputmode="numeric" />
+        <input id="page-number" type="text" value="1" inputmode="numeric" pattern="[0-9]*" />
         <span>/ <span id="page-count">—</span></span>
       </label>
       <button id="next-page" class="icon-button" type="button" aria-label="Next page" title="Next page">
@@ -144,6 +144,7 @@
     <script type="module" src="viewer/selection/text-selection.js"></script>
     <script type="module" src="viewer/search/search-highlight-cues.js"></script>
     <script type="module" src="viewer/navigation/minimap.js"></script>
+    <script type="module" src="viewer/navigation/page-number-input.js"></script>
     <script type="module" src="viewer/sharing/copy-file-url.js"></script>
     <script type="module" src="viewer/sharing/summarize-with-chatgpt.js"></script>
     <script type="module" src="viewer/sharing/qr-file-url.js"></script>
