@@ -22,11 +22,17 @@ for (const contentScript of manifest.content_scripts || []) {
 
 await Promise.all([
   build({
-    entryPoints: ["src/viewer/viewer.js"],
+    entryPoints: [
+      "src/viewer/viewer.js",
+      "src/viewer/navigation/minimap.js",
+    ],
     bundle: true,
+    splitting: true,
     format: "esm",
     target: "chrome130",
-    outfile: `${outdir}/viewer/viewer.js`,
+    outdir,
+    outbase: "src",
+    chunkNames: "viewer/chunks/[name]-[hash]",
     minify: false,
     sourcemap: false,
   }),

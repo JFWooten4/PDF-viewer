@@ -54,6 +54,7 @@ const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
   "assets/copy-page-icon-light.png",
 );
 const SCANNED_PAGE_IMAGE_AREA_THRESHOLD = 0.8;
+const RENDER_WINDOW_RADIUS = 3;
 
 let pdfDocument;
 let pdfLinkService;
@@ -169,6 +170,7 @@ function setCurrentPage(pageNumber) {
   previousButton.disabled = currentPage <= 1;
   nextButton.disabled = currentPage >= pdfDocument.numPages;
   void queuePageRender(currentPage, true);
+  keepRenderWindow(currentPage);
 
   if (!sectionPopover.hidden) {
     void updateCurrentSectionHighlight();
@@ -767,6 +769,51 @@ function queuePageRender(pageNumber, priority = false) {
   return drainRenderQueue();
 }
 
+function releaseRenderedPage(pageNumber) {
+  const container = pageElements[pageNumber - 1];
+  if (!container) {
+    return;
+  }
+
+  for (const canvas of container.querySelectorAll("canvas")) {
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+
+  container.replaceChildren();
+  container.classList.remove("rendered");
+  renderedPages.delete(pageNumber);
+  priorityRenderQueue.delete(pageNumber);
+  backgroundRenderQueue.delete(pageNumber);
+}
+
+function keepRenderWindow(centerPage = currentPage) {
+  if (!pdfDocument) {
+    return;
+  }
+
+  const firstPage = Math.max(1, centerPage - RENDER_WINDOW_RADIUS);
+  const lastPage = Math.min(pdfDocument.numPages, centerPage + RENDER_WINDOW_RADIUS);
+
+  for (const pageNumber of [...renderedPages]) {
+    if (pageNumber < firstPage || pageNumber > lastPage) {
+      releaseRenderedPage(pageNumber);
+    }
+  }
+
+  for (const pageNumber of [...backgroundRenderQueue]) {
+    if (pageNumber < firstPage || pageNumber > lastPage) {
+      backgroundRenderQueue.delete(pageNumber);
+    }
+  }
+
+  for (let pageNumber = firstPage; pageNumber <= lastPage; pageNumber += 1) {
+    if (pageNumber !== centerPage) {
+      void queuePageRender(pageNumber);
+    }
+  }
+}
+
 function queueAllPages() {
   for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
     if (!renderedPages.has(pageNumber) && !priorityRenderQueue.has(pageNumber)) {
@@ -959,12 +1006,14 @@ async function rotatePages(delta) {
 
   rotation = (rotation + delta + 360) % 360;
   renderGeneration += 1;
-  renderedPages.clear();
   priorityRenderQueue.clear();
   backgroundRenderQueue.clear();
+  for (const pageNumber of [...renderedPages]) {
+    releaseRenderedPage(pageNumber);
+  }
 
   await queuePageRender(currentPage, true);
-  void queueAllPages();
+  keepRenderWindow(currentPage);
   pageElements[currentPage - 1]?.scrollIntoView({ behavior: "auto", block: "center" });
 }
 
@@ -996,6 +1045,7 @@ async function printPdf() {
   for (const overlay of overlays) {
     overlay.style.display = document.documentElement.dataset.theme === "dark" ? "block" : "none";
   }
+  keepRenderWindow(currentPage);
 }
 
 async function downloadPdf() {
@@ -1184,7 +1234,6 @@ async function initialize() {
   bindControls();
   await initializeSectionNavigation();
   goToPage(currentPage, "auto");
-  void queueAllPages();
 }
 
 initialize().catch(async (error) => {

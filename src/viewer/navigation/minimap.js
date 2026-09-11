@@ -1,16 +1,41 @@
+import {
+  getDocument,
+  GlobalWorkerOptions,
+  VerbosityLevel,
+} from "../../../node_modules/pdfjs-dist/build/pdf.mjs";
+
 const viewer = document.querySelector("#viewer");
 const minimap = document.querySelector("#minimap");
 const minimapPages = document.querySelector("#minimap-pages");
 const minimapViewport = document.querySelector("#minimap-viewport");
+const rotateLeftButton = document.querySelector("#rotate-left");
+const rotateRightButton = document.querySelector("#rotate-right");
+
+const sourceMode = window.location.pathname.includes("/src/");
+
+function extensionAssetUrl(sourcePath, builtPath) {
+  return chrome.runtime.getURL(sourceMode ? sourcePath : builtPath);
+}
+
+GlobalWorkerOptions.workerSrc = extensionAssetUrl(
+  "node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
+  "pdf.worker.min.mjs",
+);
 
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
+const MINIMAP_THUMBNAIL_WIDTH = 80;
 const WHEEL_LINE_HEIGHT = 16;
+const params = new URLSearchParams(window.location.search);
+const source = params.get("url");
 
 let syncFrame;
 let dragging = false;
 let dragOffset = 0;
 let viewportHeight = 18;
 let mapHeight = 0;
+let thumbnailDocument;
+let thumbnailGeneration = 0;
+let thumbnailRotation = 0;
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -45,28 +70,6 @@ function ensureTiles(pages) {
   return tiles;
 }
 
-function syncThumbnail(page, tile) {
-  const sourceCanvas = page.querySelector("canvas");
-  if (!sourceCanvas || tile.sourceCanvas === sourceCanvas) {
-    return;
-  }
-
-  let thumbnail = tile.querySelector("canvas");
-  if (!thumbnail) {
-    thumbnail = document.createElement("canvas");
-    tile.append(thumbnail);
-  }
-
-  const thumbnailWidth = 80;
-  const ratio = sourceCanvas.height / Math.max(sourceCanvas.width, 1);
-  thumbnail.width = thumbnailWidth;
-  thumbnail.height = Math.max(1, Math.round(thumbnailWidth * ratio));
-
-  const context = thumbnail.getContext("2d", { alpha: false });
-  context.drawImage(sourceCanvas, 0, 0, thumbnail.width, thumbnail.height);
-  tile.sourceCanvas = sourceCanvas;
-}
-
 function documentMetrics() {
   const documentHeight = Math.max(document.documentElement.scrollHeight, window.innerHeight, 1);
   const scrollMaximum = Math.max(documentHeight - window.innerHeight, 0);
@@ -92,7 +95,7 @@ function syncMinimap() {
 
   // Keep page thumbnails contiguous and compress long documents to the available track height.
   const pageWidth = pages[0]?.getBoundingClientRect().width || 1;
-  const thumbnailWidth = tiles[0]?.clientWidth || 80;
+  const thumbnailWidth = tiles[0]?.clientWidth || MINIMAP_THUMBNAIL_WIDTH;
   const widthScale = thumbnailWidth / pageWidth;
   const widthScaledHeights = pages.map((page) => page.getBoundingClientRect().height * widthScale);
   const widthScaledHeight = widthScaledHeights.reduce((total, height) => total + height, 0);
@@ -111,7 +114,6 @@ function syncMinimap() {
     tile.style.top = `${packedTop}px`;
     tile.style.height = `${tileHeight}px`;
     packedTop += tileHeight;
-    syncThumbnail(page, tile);
   });
 
   viewportHeight = Math.min(
@@ -125,6 +127,156 @@ function syncMinimap() {
   minimapViewport.style.height = `${viewportHeight}px`;
   minimap.setAttribute("aria-valuemax", String(Math.round(scrollMaximum)));
   minimap.setAttribute("aria-valuenow", String(Math.round(window.scrollY)));
+}
+
+function waitForPageElements(expectedCount) {
+  if (viewer.querySelectorAll(".page").length === expectedCount) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const observer = new MutationObserver(() => {
+      if (viewer.querySelectorAll(".page").length !== expectedCount) {
+        return;
+      }
+
+      observer.disconnect();
+      resolve();
+    });
+
+    observer.observe(viewer, { childList: true });
+  });
+}
+
+function yieldToBrowser() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function resolveThumbnailSource() {
+  if (chrome.mimeHandler?.getStreamInfo) {
+    try {
+      const streamInfo = await chrome.mimeHandler.getStreamInfo();
+      const response = await fetch(streamInfo.streamUrl);
+      if (!response.ok) {
+        throw new Error(`Could not read PDF stream (${response.status}).`);
+      }
+
+      return { data: new Uint8Array(await response.arrayBuffer()) };
+    } catch {
+      if (!source) {
+        return null;
+      }
+    }
+  }
+
+  if (!source) {
+    return null;
+  }
+
+  const requestUrl = new URL(source);
+  requestUrl.hash = "";
+  return { url: requestUrl.href };
+}
+
+async function loadThumbnailDocument() {
+  const resolvedSource = await resolveThumbnailSource();
+  if (!resolvedSource) {
+    return;
+  }
+
+  const documentOptions = {
+    cMapUrl: extensionAssetUrl("node_modules/pdfjs-dist/cmaps/", "cmaps/"),
+    cMapPacked: true,
+    standardFontDataUrl: extensionAssetUrl(
+      "node_modules/pdfjs-dist/standard_fonts/",
+      "standard_fonts/",
+    ),
+    verbosity: VerbosityLevel.ERRORS,
+    wasmUrl: extensionAssetUrl("node_modules/pdfjs-dist/wasm/", "wasm/"),
+  };
+
+  if (resolvedSource.data) {
+    documentOptions.data = resolvedSource.data;
+  } else {
+    documentOptions.url = resolvedSource.url;
+    documentOptions.withCredentials = true;
+  }
+
+  thumbnailDocument = await getDocument(documentOptions).promise;
+  await waitForPageElements(thumbnailDocument.numPages);
+  scheduleSync();
+  await renderAllThumbnails();
+}
+
+async function renderThumbnail(pageNumber, generation) {
+  const page = await thumbnailDocument.getPage(pageNumber);
+  if (generation !== thumbnailGeneration) {
+    page.cleanup();
+    return null;
+  }
+
+  const baseViewport = page.getViewport({ scale: 1, rotation: thumbnailRotation });
+  const viewport = page.getViewport({
+    scale: MINIMAP_THUMBNAIL_WIDTH / Math.max(baseViewport.width, 1),
+    rotation: thumbnailRotation,
+  });
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { alpha: false });
+  canvas.width = Math.max(1, Math.round(viewport.width));
+  canvas.height = Math.max(1, Math.round(viewport.height));
+
+  try {
+    await page.render({ canvasContext: context, viewport }).promise;
+  } catch {
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  page.cleanup();
+  return generation === thumbnailGeneration ? canvas : null;
+}
+
+async function renderAllThumbnails() {
+  if (!thumbnailDocument) {
+    return;
+  }
+
+  const generation = ++thumbnailGeneration;
+  const pages = Array.from(viewer.querySelectorAll(".page"));
+  if (pages.length !== thumbnailDocument.numPages) {
+    return;
+  }
+
+  const tiles = ensureTiles(pages);
+  const thumbnails = [];
+
+  // Render the complete minimap off-DOM, then swap it in at once so loading never
+  // appears as a thumbnail trail painting down the document.
+  for (let pageNumber = 1; pageNumber <= thumbnailDocument.numPages; pageNumber += 1) {
+    const canvas = await renderThumbnail(pageNumber, generation);
+    if (!canvas || generation !== thumbnailGeneration) {
+      return;
+    }
+
+    thumbnails.push(canvas);
+    if (pageNumber % 4 === 0) {
+      await yieldToBrowser();
+    }
+  }
+
+  if (generation !== thumbnailGeneration) {
+    return;
+  }
+
+  tiles.forEach((tile, index) => tile.replaceChildren(thumbnails[index]));
+  scheduleSync();
+}
+
+function rerenderThumbnails(delta) {
+  thumbnailRotation = (thumbnailRotation + delta + 360) % 360;
+  if (thumbnailDocument) {
+    void renderAllThumbnails();
+  }
 }
 
 function scrollFromViewportTop(viewportTop) {
@@ -228,6 +380,9 @@ minimap.addEventListener("keydown", (event) => {
   event.preventDefault();
 });
 
+rotateLeftButton?.addEventListener("click", () => rerenderThumbnails(-90));
+rotateRightButton?.addEventListener("click", () => rerenderThumbnails(90));
+
 const mutationObserver = new MutationObserver(scheduleSync);
 mutationObserver.observe(viewer, { childList: true, subtree: true });
 
@@ -236,5 +391,10 @@ resizeObserver.observe(viewer);
 
 window.addEventListener("scroll", scheduleSync, { passive: true });
 window.addEventListener("resize", scheduleSync);
+window.addEventListener("pagehide", () => {
+  thumbnailGeneration += 1;
+  void thumbnailDocument?.destroy();
+});
 
 scheduleSync();
+void loadThumbnailDocument();
