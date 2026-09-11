@@ -47,7 +47,13 @@ function ensureTiles(pages) {
 
 function syncThumbnail(page, tile) {
   const sourceCanvas = page.querySelector("canvas");
-  if (!sourceCanvas || tile.sourceCanvas === sourceCanvas) {
+  if (!sourceCanvas) {
+    tile.replaceChildren();
+    tile.sourceCanvas = undefined;
+    return;
+  }
+
+  if (tile.sourceCanvas === sourceCanvas) {
     return;
   }
 
