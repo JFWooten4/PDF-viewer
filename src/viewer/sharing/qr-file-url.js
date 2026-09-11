@@ -9,19 +9,32 @@ const toolsButton = document.querySelector("#tools-button");
 const toolsMenu = document.querySelector("#tools-menu");
 const source = new URLSearchParams(window.location.search).get("url");
 
+function shareableWebUrl(value) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveOriginalFileUrl() {
   if (chrome.mimeHandler?.getStreamInfo) {
     try {
       const streamInfo = await chrome.mimeHandler.getStreamInfo();
       if (streamInfo?.originalUrl) {
-        return new URL(streamInfo.originalUrl).href;
+        return shareableWebUrl(streamInfo.originalUrl);
       }
     } catch {
       // Fall back to the explicit viewer URL below.
     }
   }
 
-  return source ? new URL(source).href : null;
+  return shareableWebUrl(source);
 }
 
 function closeToolsMenu() {
@@ -34,10 +47,22 @@ function closeDialog() {
   qrButton.focus();
 }
 
+function setQrButtonAvailability(fileUrl) {
+  const unavailable = !fileUrl;
+  qrButton.disabled = unavailable;
+  qrButton.style.opacity = unavailable ? "0.45" : "";
+  qrButton.style.cursor = unavailable ? "default" : "";
+  qrButton.title = unavailable ? "QR file URL requires an HTTP or HTTPS document URL" : "";
+  return fileUrl;
+}
+
+qrButton.disabled = true;
+const fileUrlPromise = resolveOriginalFileUrl().then(setQrButtonAvailability);
+
 qrButton.addEventListener("click", async () => {
   closeToolsMenu();
 
-  const fileUrl = await resolveOriginalFileUrl();
+  const fileUrl = await fileUrlPromise;
   if (!fileUrl) {
     return;
   }
