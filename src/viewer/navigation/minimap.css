@@ -1,20 +1,20 @@
 @media (min-width: 701px) {
-  html {
+  html:not(.minimap-disabled) {
     scrollbar-width: none;
   }
 
-  html::-webkit-scrollbar,
-  body::-webkit-scrollbar {
+  html:not(.minimap-disabled)::-webkit-scrollbar,
+  html:not(.minimap-disabled) body::-webkit-scrollbar {
     display: none;
     width: 0;
     height: 0;
   }
 
-  .viewer {
+  html:not(.minimap-disabled) .viewer {
     padding-right: 112px;
   }
 
-  .page {
+  html:not(.minimap-disabled) .page {
     width: min(1100px, calc(100vw - 128px));
   }
 }
@@ -32,6 +32,10 @@
   cursor: pointer;
   user-select: none;
   touch-action: none;
+}
+
+.minimap-disabled .minimap {
+  display: none;
 }
 
 .minimap:focus-visible {

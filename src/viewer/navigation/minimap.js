@@ -2,7 +2,9 @@ const viewer = document.querySelector("#viewer");
 const minimap = document.querySelector("#minimap");
 const minimapPages = document.querySelector("#minimap-pages");
 const minimapViewport = document.querySelector("#minimap-viewport");
+const minimapToggle = document.querySelector("#show-minimap");
 
+const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const WHEEL_LINE_HEIGHT = 16;
 
@@ -16,8 +18,29 @@ function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
+function minimapEnabled() {
+  return !document.documentElement.classList.contains("minimap-disabled");
+}
+
+function setMinimapEnabled(enabled, persist = true) {
+  document.documentElement.classList.toggle("minimap-disabled", !enabled);
+  minimapToggle.checked = enabled;
+  minimap.setAttribute("aria-hidden", String(!enabled));
+  minimap.tabIndex = enabled ? 0 : -1;
+
+  if (persist) {
+    localStorage.setItem(MINIMAP_STORAGE_KEY, String(enabled));
+  }
+
+  if (enabled) {
+    scheduleSync();
+  }
+
+  window.dispatchEvent(new Event("resize"));
+}
+
 function scheduleSync() {
-  if (syncFrame) {
+  if (!minimapEnabled() || syncFrame) {
     return;
   }
 
@@ -227,6 +250,13 @@ minimap.addEventListener("keydown", (event) => {
   window.scrollTo({ top: target, behavior: "auto" });
   event.preventDefault();
 });
+
+minimapToggle.addEventListener("change", () => {
+  setMinimapEnabled(minimapToggle.checked);
+});
+
+const storedMinimapPreference = localStorage.getItem(MINIMAP_STORAGE_KEY);
+setMinimapEnabled(storedMinimapPreference !== "false", false);
 
 const mutationObserver = new MutationObserver(scheduleSync);
 mutationObserver.observe(viewer, { childList: true, subtree: true });
