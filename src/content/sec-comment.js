@@ -2,8 +2,31 @@
   const THEME_STORAGE_KEY = "pdf-viewer-theme";
   const SEC_COMMENT_DARK_MODE_KEY = "pdf-viewer-sec-comment-dark-mode";
   const STYLE_ID = "pdf-viewer-sec-comment-dark-style";
+  const SELECTION_STYLE_ID = "pdf-viewer-sec-selection-style";
+  const isCommentPage = /^\/comments\/.+\.html?$/i.test(window.location.pathname);
 
-  if (!/^\/comments\/.+\.html?$/i.test(window.location.pathname)) {
+  const selectionStyles = `
+    ::selection {
+      background: Highlight !important;
+      color: HighlightText !important;
+      text-shadow: none !important;
+    }
+  `;
+
+  function applySelectionStyle() {
+    if (document.getElementById(SELECTION_STYLE_ID)) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = SELECTION_STYLE_ID;
+    style.textContent = selectionStyles;
+    (document.head || document.documentElement).append(style);
+  }
+
+  applySelectionStyle();
+
+  if (!isCommentPage) {
     return;
   }
 
