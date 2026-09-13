@@ -3,6 +3,7 @@ import {
   GlobalWorkerOptions,
   VerbosityLevel,
 } from "../../../node_modules/pdfjs-dist/build/pdf.mjs";
+import { resolvePdfSource } from "../pdf-source.js";
 
 const viewer = document.querySelector("#viewer");
 const minimap = document.querySelector("#minimap");
@@ -27,9 +28,6 @@ const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const MINIMAP_THUMBNAIL_WIDTH = 80;
 const WHEEL_LINE_HEIGHT = 16;
-const params = new URLSearchParams(window.location.search);
-const source = params.get("url");
-
 let syncFrame;
 let dragging = false;
 let dragOffset = 0;
@@ -175,35 +173,11 @@ function yieldToBrowser() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-async function resolveThumbnailSource() {
-  if (chrome.mimeHandler?.getStreamInfo) {
-    try {
-      const streamInfo = await chrome.mimeHandler.getStreamInfo();
-      const response = await fetch(streamInfo.streamUrl);
-      if (!response.ok) {
-        throw new Error(`Could not read PDF stream (${response.status}).`);
-      }
-
-      return { data: new Uint8Array(await response.arrayBuffer()) };
-    } catch {
-      if (!source) {
-        return null;
-      }
-    }
-  }
-
-  if (!source) {
-    return null;
-  }
-
-  const requestUrl = new URL(source);
-  requestUrl.hash = "";
-  return { url: requestUrl.href };
-}
-
 async function loadThumbnailDocument() {
-  const resolvedSource = await resolveThumbnailSource();
-  if (!resolvedSource) {
+  let resolvedSource;
+  try {
+    resolvedSource = await resolvePdfSource();
+  } catch {
     return;
   }
 

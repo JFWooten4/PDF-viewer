@@ -4,7 +4,8 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../src/viewer/navigation/minimap.js', import.meta.url), 'utf8')
-  .replace(/^import \{[\s\S]*?\} from "\.\.\/\.\.\/\.\.\/node_modules\/pdfjs-dist\/build\/pdf\.mjs";\n/, '');
+  .replace(/^import \{[\s\S]*?\} from "\.\.\/\.\.\/\.\.\/node_modules\/pdfjs-dist\/build\/pdf\.mjs";\n/, '')
+  .replace(/^import \{ resolvePdfSource \} from "\.\.\/pdf-source\.js";\n/, '');
 const styles = readFileSync(new URL('../src/viewer/navigation/minimap.css', import.meta.url), 'utf8');
 function fixture(count, height = 900) {
   const windowEvents = [];
@@ -34,6 +35,7 @@ function fixture(count, height = 900) {
   const observer = class { observe() {} };
   const chrome = { runtime: { getURL: value => value } };
   const context = vm.createContext({ document, window, localStorage, chrome,
+    resolvePdfSource: async () => { throw new Error('No PDF source in geometry fixture'); },
     GlobalWorkerOptions: {}, VerbosityLevel: { ERRORS: 0 }, URLSearchParams, Event, MutationObserver: observer,
     ResizeObserver: observer, WheelEvent: { DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2 }, requestAnimationFrame() { return 1; } });
   vm.runInContext(source, context);
