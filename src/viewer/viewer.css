@@ -203,6 +203,7 @@ input {
   font-weight: 650;
   line-height: 1.35;
   overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .section-document-title:not([hidden]) + .section-popover-title {
