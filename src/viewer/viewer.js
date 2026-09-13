@@ -832,7 +832,7 @@ function resetSearchResults() {
   refreshSearchHighlights("");
 }
 
-function showSearchMatch(index, behavior = "smooth") {
+function showSearchMatch(index, behavior = "auto") {
   if (!searchMatches.length) {
     return;
   }
