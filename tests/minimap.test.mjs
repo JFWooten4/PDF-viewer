@@ -148,3 +148,10 @@ test('the loading screen remains until concurrent thumbnails and the first two p
   assert.match(viewerStyles, /\.minimap-preparing \.minimap\s*\{[\s\S]*?visibility:\s*hidden/);
   assert.match(viewerStyles, /html:not\(\.minimap-preparing\) \.status:not\(\.error\)\s*\{[\s\S]*?display:\s*none/);
 });
+
+test('thumbnail edges fade softly into the minimap background', () => {
+  assert.doesNotMatch(styles, /\.minimap\s*\{[\s\S]*?border-left:/);
+  assert.match(styles, /\.minimap-page\s*\{[\s\S]*?-webkit-mask-image:\s*linear-gradient\(/);
+  assert.match(styles, /\.minimap-page\s*\{[\s\S]*?mask-image:\s*linear-gradient\(/);
+  assert.match(styles, /transparent[\s\S]*?#000 40%[\s\S]*?#000 60%[\s\S]*?transparent/);
+});

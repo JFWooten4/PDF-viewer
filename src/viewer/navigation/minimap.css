@@ -26,7 +26,6 @@
   z-index: 9;
   width: 96px;
   overflow: hidden;
-  border-left: 1px solid var(--border);
   outline: 0;
   background: var(--toolbar-bg);
   cursor: pointer;
@@ -56,6 +55,28 @@
   min-height: 0;
   overflow: hidden;
   background: var(--page-bg);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 12%) 12%,
+    rgb(0 0 0 / 48%) 25%,
+    #000 40%,
+    #000 60%,
+    rgb(0 0 0 / 48%) 75%,
+    rgb(0 0 0 / 12%) 88%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 12%) 12%,
+    rgb(0 0 0 / 48%) 25%,
+    #000 40%,
+    #000 60%,
+    rgb(0 0 0 / 48%) 75%,
+    rgb(0 0 0 / 12%) 88%,
+    transparent
+  );
   opacity: 0.82;
 }
 
