@@ -60,6 +60,28 @@ html {
   scroll-behavior: smooth;
 }
 
+.page,
+.minimap {
+  transition: opacity 180ms ease;
+}
+
+.minimap-preparing .page,
+.minimap-preparing .minimap {
+  visibility: hidden;
+  opacity: 0;
+}
+
+html:not(.minimap-preparing) .status:not(.error) {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page,
+  .minimap {
+    transition: none;
+  }
+}
+
 body {
   margin: 0;
   min-width: 320px;
