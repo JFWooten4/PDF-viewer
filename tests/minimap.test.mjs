@@ -147,6 +147,7 @@ test('the loading screen remains until concurrent thumbnails and the first two p
   assert.doesNotMatch(viewerSource, /status\.remove\(\)/);
   assert.match(viewerStyles, /\.minimap-preparing \.minimap\s*\{[\s\S]*?visibility:\s*hidden/);
   assert.match(viewerStyles, /html:not\(\.minimap-preparing\) \.status:not\(\.error\)\s*\{[\s\S]*?display:\s*none/);
+  assert.doesNotMatch(viewerStyles, /\.page,\s*\.minimap\s*\{[\s\S]*?transition:\s*opacity/);
 });
 
 test('thumbnail edges fade softly into the minimap background', () => {
