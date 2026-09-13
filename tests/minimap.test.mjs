@@ -155,3 +155,9 @@ test('thumbnail edges fade softly into the minimap background', () => {
   assert.match(styles, /\.minimap-page\s*\{[\s\S]*?mask-image:\s*linear-gradient\(/);
   assert.match(styles, /transparent[\s\S]*?#000 10%[\s\S]*?#000 90%[\s\S]*?transparent/);
 });
+
+test('thumbnail canvases render below their displayed width', () => {
+  assert.match(source, /MINIMAP_THUMBNAIL_WIDTH\s*=\s*80/);
+  assert.match(source, /MINIMAP_THUMBNAIL_RENDER_WIDTH\s*=\s*24/);
+  assert.match(source, /scale:\s*MINIMAP_THUMBNAIL_RENDER_WIDTH\s*\/\s*Math\.max\(baseViewport\.width, 1\)/);
+});
