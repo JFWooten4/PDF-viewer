@@ -20,6 +20,7 @@ const pageNumberInput = document.querySelector("#page-number");
 const pageCount = document.querySelector("#page-count");
 const searchInput = document.querySelector("#search-input");
 const searchCount = document.querySelector("#search-count");
+const searchFirstButton = document.querySelector("#search-first");
 const searchPreviousButton = document.querySelector("#search-previous");
 const searchNextButton = document.querySelector("#search-next");
 const shareButton = document.querySelector("#share-page");
@@ -824,6 +825,7 @@ function resetSearchResults() {
   activeSearchIndex = -1;
   completedSearchQuery = "";
   searchCount.textContent = "";
+  searchFirstButton.disabled = true;
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;
   clearSearchPageMarker();
@@ -839,6 +841,7 @@ function showSearchMatch(index, behavior = "smooth") {
   const match = searchMatches[activeSearchIndex];
 
   searchCount.textContent = `${activeSearchIndex + 1} / ${searchMatches.length}`;
+  searchFirstButton.disabled = activeSearchIndex === 0;
   searchPreviousButton.disabled = false;
   searchNextButton.disabled = false;
 
@@ -856,6 +859,7 @@ function showSearchMatch(index, behavior = "smooth") {
 async function runSearch(rawQuery) {
   const query = normalizeSearchText(rawQuery);
   const requestId = ++searchRequestId;
+  const searchStartPage = currentPage;
 
   clearTimeout(searchTimer);
 
@@ -865,6 +869,7 @@ async function runSearch(rawQuery) {
   }
 
   searchCount.textContent = "…";
+  searchFirstButton.disabled = true;
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;
   clearSearchPageMarker();
@@ -902,12 +907,14 @@ async function runSearch(rawQuery) {
   if (!matches.length) {
     activeSearchIndex = -1;
     searchCount.textContent = "0 / 0";
+    searchFirstButton.disabled = true;
     searchPreviousButton.disabled = true;
     searchNextButton.disabled = true;
     return;
   }
 
-  showSearchMatch(0, "auto");
+  const nearbyMatchIndex = matches.findIndex((match) => match.pageNumber >= searchStartPage);
+  showSearchMatch(nearbyMatchIndex === -1 ? 0 : nearbyMatchIndex, "auto");
 }
 
 function scheduleSearch() {
@@ -921,6 +928,7 @@ function scheduleSearch() {
   }
 
   searchCount.textContent = "…";
+  searchFirstButton.disabled = true;
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;
   clearSearchPageMarker();
@@ -1049,6 +1057,7 @@ function bindControls() {
   });
 
   searchInput.addEventListener("input", scheduleSearch);
+  searchFirstButton.addEventListener("click", () => showSearchMatch(0));
   searchPreviousButton.addEventListener("click", () => stepSearch(-1));
   searchNextButton.addEventListener("click", () => stepSearch(1));
 
@@ -1206,6 +1215,7 @@ initialize().catch(async (error) => {
   toolsButton.disabled = true;
   pageNumberInput.disabled = true;
   searchInput.disabled = true;
+  searchFirstButton.disabled = true;
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;
 });
