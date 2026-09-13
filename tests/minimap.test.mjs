@@ -7,6 +7,8 @@ const source = readFileSync(new URL('../src/viewer/navigation/minimap.js', impor
   .replace(/^import \{[\s\S]*?\} from "\.\.\/\.\.\/\.\.\/node_modules\/pdfjs-dist\/build\/pdf\.mjs";\n/, '')
   .replace(/^import \{ resolvePdfSource \} from "\.\.\/pdf-source\.js";\n/, '');
 const styles = readFileSync(new URL('../src/viewer/navigation/minimap.css', import.meta.url), 'utf8');
+const viewerStyles = readFileSync(new URL('../src/viewer/viewer.css', import.meta.url), 'utf8');
+const viewerSource = readFileSync(new URL('../src/viewer/viewer.js', import.meta.url), 'utf8');
 function fixture(count, height = 900) {
   const windowEvents = [];
   const window = { innerHeight: height, scrollY: 0, location: { pathname: '/src/viewer.html', search: '' }, addEventListener() {},
@@ -25,6 +27,7 @@ function fixture(count, height = 900) {
   const document = { querySelector: selector => elements[selector],
     documentElement: { scrollHeight: count * 1420, classList: {
       contains: value => classes.has(value),
+      add(value) { classes.add(value); },
       toggle(value, force) { force ? classes.add(value) : classes.delete(value); },
     } } };
   const storedValues = new Map();
@@ -131,4 +134,17 @@ test('minimap toggle persists visibility and updates accessibility state', () =>
   assert.equal(f.track.tabIndex, 0);
   assert.equal(f.storedValues.get('pdf-viewer-show-minimap'), 'true');
   assert.deepEqual(f.windowEvents, ['resize', 'resize', 'resize']);
+});
+
+test('the loading screen remains until concurrent thumbnails and the first two pages are ready', () => {
+  assert.match(source, /MINIMAP_RENDER_CONCURRENCY\s*=\s*4/);
+  assert.match(source, /await Promise\.all\(/);
+  assert.match(source, /loadThumbnailDocument\(\)\.catch\(\(\) => \{\}\)\.finally\(finishMinimapPreparation\)/);
+  assert.match(source, /classList\.add\("minimap-ready"\)/);
+  assert.match(viewerSource, /requiredPageCount\s*=\s*Math\.min\(2, pdfDocument\.numPages\)/);
+  assert.match(viewerSource, /classList\.add\("document-ready"\)/);
+  assert.match(viewerSource, /goToPage\(currentPage, "auto"\);\s*keepRenderWindow\(currentPage\);/);
+  assert.doesNotMatch(viewerSource, /status\.remove\(\)/);
+  assert.match(viewerStyles, /\.minimap-preparing \.minimap\s*\{[\s\S]*?visibility:\s*hidden/);
+  assert.match(viewerStyles, /html:not\(\.minimap-preparing\) \.status:not\(\.error\)\s*\{[\s\S]*?display:\s*none/);
 });

@@ -630,6 +630,19 @@ function yieldToBrowser() {
   return new Promise((resolve) => requestAnimationFrame(resolve));
 }
 
+function markDocumentReady() {
+  const requiredPageCount = Math.min(2, pdfDocument.numPages);
+  if (renderedPages.size < requiredPageCount) {
+    return;
+  }
+
+  const root = document.documentElement;
+  root.classList.add("document-ready");
+  if (root.classList.contains("minimap-ready")) {
+    requestAnimationFrame(() => root.classList.toggle("minimap-preparing", false));
+  }
+}
+
 function pageIsInRenderWindow(pageNumber) {
   return Math.abs(pageNumber - currentPage) <= RENDER_WINDOW_RADIUS;
 }
@@ -752,6 +765,7 @@ async function renderPageNow(pageNumber) {
   );
   container.classList.add("rendered");
   renderedPages.add(pageNumber);
+  markDocumentReady();
   page.cleanup();
 }
 
@@ -864,7 +878,6 @@ function createPagePlaceholders(sampleViewport) {
     return element;
   });
 
-  status.remove();
   viewer.append(fragment);
 }
 
@@ -1273,6 +1286,7 @@ async function initialize() {
   bindControls();
   await initializeSectionNavigation();
   goToPage(currentPage, "auto");
+  keepRenderWindow(currentPage);
 }
 
 initialize().catch(async (error) => {
