@@ -29,25 +29,11 @@
   top: 50%;
   left: 50%;
   width: clamp(210px, 42vw, 320px);
-  aspect-ratio: 160 / 84;
+  aspect-ratio: 2 / 1;
   background: url("../assets/rainbow-dash-wonderbolt-loader.svg") center / contain no-repeat;
-  image-rendering: pixelated;
-  filter: drop-shadow(10px 8px 0 rgb(0 0 0 / 16%));
+  filter: drop-shadow(0 8px 8px rgb(0 0 0 / 24%));
   transform-origin: 50% 50%;
-  animation: rainbow-dash-race 880ms steps(6, end) infinite;
-}
-
-.status:not(.error)::after {
-  content: "Loading PDF…";
-  position: absolute;
-  z-index: 2;
-  inset: auto 0 14px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  text-align: center;
-  text-transform: uppercase;
+  animation: rainbow-dash-race 880ms ease-in-out infinite;
 }
 
 @keyframes loading-race-lines {
@@ -80,9 +66,6 @@
     margin-top: 10vh;
   }
 
-  .status:not(.error)::after {
-    bottom: 8px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

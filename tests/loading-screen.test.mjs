@@ -10,4 +10,5 @@ test("the standalone preview keeps the loading state visible", () => {
   assert.match(preview, /<div class="status">Loading PDF…<\/div>/);
   assert.match(styles, /\.status:not\(\.error\)::before/);
   assert.match(styles, /rainbow-dash-wonderbolt-loader\.svg/);
+  assert.doesNotMatch(styles, /content:\s*"Loading PDF…"/);
 });
