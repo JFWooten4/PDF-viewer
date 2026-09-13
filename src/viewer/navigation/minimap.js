@@ -28,7 +28,7 @@ const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_RENDER_CONCURRENCY = 4;
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const MINIMAP_THUMBNAIL_WIDTH = 80;
-const MINIMAP_THUMBNAIL_RENDER_WIDTH = 32;
+const MINIMAP_THUMBNAIL_RENDER_WIDTH = 24;
 const WHEEL_LINE_HEIGHT = 16;
 let syncFrame;
 let dragging = false;

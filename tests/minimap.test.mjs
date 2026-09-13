@@ -151,6 +151,6 @@ test('the loading screen remains until concurrent thumbnails and the first two p
 
 test('thumbnail canvases render below their displayed width', () => {
   assert.match(source, /MINIMAP_THUMBNAIL_WIDTH\s*=\s*80/);
-  assert.match(source, /MINIMAP_THUMBNAIL_RENDER_WIDTH\s*=\s*32/);
+  assert.match(source, /MINIMAP_THUMBNAIL_RENDER_WIDTH\s*=\s*24/);
   assert.match(source, /scale:\s*MINIMAP_THUMBNAIL_RENDER_WIDTH\s*\/\s*Math\.max\(baseViewport\.width, 1\)/);
 });
