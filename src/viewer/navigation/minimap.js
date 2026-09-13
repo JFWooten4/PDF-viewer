@@ -28,6 +28,7 @@ const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_RENDER_CONCURRENCY = 4;
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const MINIMAP_THUMBNAIL_WIDTH = 80;
+const MINIMAP_THUMBNAIL_RENDER_WIDTH = 32;
 const WHEEL_LINE_HEIGHT = 16;
 let syncFrame;
 let dragging = false;
@@ -223,7 +224,7 @@ async function renderThumbnail(pageNumber, generation) {
 
   const baseViewport = page.getViewport({ scale: 1, rotation: thumbnailRotation });
   const viewport = page.getViewport({
-    scale: MINIMAP_THUMBNAIL_WIDTH / Math.max(baseViewport.width, 1),
+    scale: MINIMAP_THUMBNAIL_RENDER_WIDTH / Math.max(baseViewport.width, 1),
     rotation: thumbnailRotation,
   });
   const canvas = document.createElement("canvas");
