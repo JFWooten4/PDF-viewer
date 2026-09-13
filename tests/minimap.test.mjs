@@ -3,11 +3,12 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../src/viewer/navigation/minimap.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/viewer/navigation/minimap.js', import.meta.url), 'utf8')
+  .replace(/^import \{[\s\S]*?\} from "\.\.\/\.\.\/\.\.\/node_modules\/pdfjs-dist\/build\/pdf\.mjs";\n/, '');
 const styles = readFileSync(new URL('../src/viewer/navigation/minimap.css', import.meta.url), 'utf8');
 function fixture(count, height = 900) {
   const windowEvents = [];
-  const window = { innerHeight: height, scrollY: 0, addEventListener() {},
+  const window = { innerHeight: height, scrollY: 0, location: { pathname: '/src/viewer.html', search: '' }, addEventListener() {},
     dispatchEvent(event) { windowEvents.push(event.type); },
     scrollTo({ top }) { this.scrollY = top; } };
   const tiles = Array.from({ length: count }, () => ({ clientWidth: 80, style: {} }));
@@ -31,7 +32,9 @@ function fixture(count, height = 900) {
     setItem: (key, value) => storedValues.set(key, value),
   };
   const observer = class { observe() {} };
-  const context = vm.createContext({ document, window, localStorage, Event, MutationObserver: observer,
+  const chrome = { runtime: { getURL: value => value } };
+  const context = vm.createContext({ document, window, localStorage, chrome,
+    GlobalWorkerOptions: {}, VerbosityLevel: { ERRORS: 0 }, URLSearchParams, Event, MutationObserver: observer,
     ResizeObserver: observer, WheelEvent: { DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2 }, requestAnimationFrame() { return 1; } });
   vm.runInContext(source, context);
   const sync = () => vm.runInContext('syncMinimap()', context);
