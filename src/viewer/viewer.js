@@ -163,9 +163,15 @@ function createImageOverlayCanvas(baseCanvas, viewport, imageCoordinates) {
   return overlay;
 }
 
-function getInitialPage(url) {
-  const match = url.hash.match(/(?:^#|[&#])page=(\d+)/i);
-  return match ? Math.max(1, Number.parseInt(match[1], 10)) : 1;
+function getInitialPage(...urls) {
+  for (const url of urls) {
+    const match = url.hash.match(/(?:^#|[&#])page=(\d+)/i);
+    if (match) {
+      return Math.max(1, Number.parseInt(match[1], 10));
+    }
+  }
+
+  return 1;
 }
 
 function setCurrentPage(pageNumber) {
@@ -1249,7 +1255,7 @@ async function initialize() {
   setTheme(localStorage.getItem(THEME_STORAGE_KEY) || "dark");
   const resolvedSource = await resolvePdfSource();
   originalUrl = resolvedSource.originalUrl;
-  const requestedPage = getInitialPage(originalUrl);
+  const requestedPage = getInitialPage(window.location, originalUrl);
   requestUrl = new URL(originalUrl.href);
   requestUrl.hash = "";
 
