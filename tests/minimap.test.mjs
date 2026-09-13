@@ -6,7 +6,9 @@ import vm from 'node:vm';
 const source = readFileSync(new URL('../src/viewer/navigation/minimap.js', import.meta.url), 'utf8');
 const styles = readFileSync(new URL('../src/viewer/navigation/minimap.css', import.meta.url), 'utf8');
 function fixture(count, height = 900) {
+  const windowEvents = [];
   const window = { innerHeight: height, scrollY: 0, addEventListener() {},
+    dispatchEvent(event) { windowEvents.push(event.type); },
     scrollTo({ top }) { this.scrollY = top; } };
   const tiles = Array.from({ length: count }, () => ({ clientWidth: 80, style: {} }));
   const pages = tiles.map((_, index) => ({ querySelector() { return null; },
@@ -14,17 +16,27 @@ function fixture(count, height = 900) {
   const listeners = {};
   const track = { clientHeight: height - 52, addEventListener(type, callback) { listeners[type] = callback; }, setAttribute() {} };
   const viewport = { style: {} };
+  const toggle = { checked: true, addEventListener(type, callback) { listeners[`toggle-${type}`] = callback; } };
   const elements = { '#viewer': { querySelectorAll: () => pages }, '#minimap': track,
-    '#minimap-pages': { children: tiles }, '#minimap-viewport': viewport };
+    '#minimap-pages': { children: tiles }, '#minimap-viewport': viewport, '#show-minimap': toggle };
+  const classes = new Set();
   const document = { querySelector: selector => elements[selector],
-    documentElement: { scrollHeight: count * 1420 } };
+    documentElement: { scrollHeight: count * 1420, classList: {
+      contains: value => classes.has(value),
+      toggle(value, force) { force ? classes.add(value) : classes.delete(value); },
+    } } };
+  const storedValues = new Map();
+  const localStorage = {
+    getItem: key => storedValues.get(key) ?? null,
+    setItem: (key, value) => storedValues.set(key, value),
+  };
   const observer = class { observe() {} };
-  const context = vm.createContext({ document, window, MutationObserver: observer,
+  const context = vm.createContext({ document, window, localStorage, Event, MutationObserver: observer,
     ResizeObserver: observer, WheelEvent: { DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2 }, requestAnimationFrame() { return 1; } });
   vm.runInContext(source, context);
   const sync = () => vm.runInContext('syncMinimap()', context);
   sync();
-  return { window, tiles, track, viewport, context, sync, listeners };
+  return { window, windowEvents, tiles, track, viewport, toggle, classes, storedValues, context, sync, listeners };
 }
 
 test('short documents keep fixed thumbnail heights at the top after resize', () => {
@@ -98,4 +110,20 @@ test('wheel navigation uses compact map travel and current scroll position in ev
       assert.equal(f.window.scrollY, 0);
     }
   }
+});
+
+test('minimap toggle persists visibility and updates accessibility state', () => {
+  const f = fixture(3);
+  f.toggle.checked = false;
+  f.listeners['toggle-change']();
+  assert.ok(f.classes.has('minimap-disabled'));
+  assert.equal(f.track.tabIndex, -1);
+  assert.equal(f.storedValues.get('pdf-viewer-show-minimap'), 'false');
+
+  f.toggle.checked = true;
+  f.listeners['toggle-change']();
+  assert.ok(!f.classes.has('minimap-disabled'));
+  assert.equal(f.track.tabIndex, 0);
+  assert.equal(f.storedValues.get('pdf-viewer-show-minimap'), 'true');
+  assert.deepEqual(f.windowEvents, ['resize', 'resize', 'resize']);
 });
