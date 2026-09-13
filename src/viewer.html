@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PDF Viewer</title>
+    <link rel="icon" type="image/png" href="assets/luna-mark.png" />
     <link rel="stylesheet" href="viewer/viewer.css" />
     <link rel="stylesheet" href="viewer/selection/text-selection.css" />
     <link rel="stylesheet" href="viewer/search/search-highlight-cues.css" />
@@ -29,6 +30,10 @@
           <div id="section-document-title" class="section-document-title" hidden></div>
           <div class="section-popover-title">Sections</div>
           <nav id="section-list" class="section-list" aria-label="Document sections"></nav>
+          <section id="section-metadata" class="section-metadata" hidden>
+            <div class="section-metadata-title">Metadata</div>
+            <dl id="section-metadata-list" class="section-metadata-list"></dl>
+          </section>
         </div>
       </div>
       <button id="previous-page" class="icon-button" type="button" aria-label="Previous page" title="Previous page">
@@ -60,6 +65,7 @@
             aria-label="Search document"
           />
           <span id="search-count" class="search-count" aria-live="polite"></span>
+          <button id="search-first" class="search-nav-button" type="button" aria-label="First search result" title="First result" disabled>⇈</button>
           <button id="search-previous" class="search-nav-button" type="button" aria-label="Previous search result" title="Previous result" disabled>↑</button>
           <button id="search-next" class="search-nav-button" type="button" aria-label="Next search result" title="Next result" disabled>↓</button>
         </div>
@@ -80,7 +86,13 @@
         <img id="share-icon" alt="" aria-hidden="true" />
       </button>
       <div id="tools" class="tools">
-        <button id="tools-button" class="mark-button tools-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" aria-label="More PDF tools" title="More PDF tools">⋯</button>
+        <button id="tools-button" class="mark-button tools-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" aria-label="More PDF tools" title="More PDF tools">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <circle cx="5" cy="12" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="19" cy="12" r="1.8" />
+          </svg>
+        </button>
         <div id="tools-menu" class="tools-menu" role="menu" hidden>
           <button id="rotate-left" class="tool-button" type="button" role="menuitem">↶ <span>Rotate left</span></button>
           <button id="rotate-right" class="tool-button" type="button" role="menuitem">↷ <span>Rotate right</span></button>
@@ -96,6 +108,11 @@
           </button>
           <button id="qr-file-url" class="tool-button" type="button" role="menuitem">▦ <span>QR file URL</span></button>
           <div class="menu-separator" role="separator"></div>
+          <label class="tool-toggle" title="Use the document minimap instead of the browser scrollbar">
+            <span>Show minimap</span>
+            <input id="show-minimap" class="toggle-input" type="checkbox" checked />
+            <span class="toggle-switch" aria-hidden="true"></span>
+          </label>
           <label class="tool-toggle" title="Keep embedded PDF images in their original colors in dark mode">
             <span>Preserve image colors</span>
             <input id="preserve-image-colors" class="toggle-input" type="checkbox" checked />
@@ -140,7 +157,9 @@
     <script src="viewer/navigation/toolbar-layout.js"></script>
     <script src="viewer/network-fallback.js"></script>
     <script type="module" src="viewer/theme/image-color-toggle.js"></script>
+    <script type="module" src="viewer/document-identity.js"></script>
     <script type="module" src="viewer/viewer.js"></script>
+    <script type="module" src="viewer/navigation/rapid-page-navigation.js"></script>
     <script type="module" src="viewer/selection/text-selection.js"></script>
     <script type="module" src="viewer/search/search-highlight-cues.js"></script>
     <script type="module" src="viewer/navigation/minimap.js"></script>
@@ -149,6 +168,7 @@
     <script type="module" src="viewer/sharing/summarize-with-chatgpt.js"></script>
     <script type="module" src="viewer/sharing/qr-file-url.js"></script>
     <script type="module" src="viewer/viewer-settings.js"></script>
+    <script type="module" src="viewer/initial-zoom.js"></script>
     <script type="module" src="viewer/close-tab-shortcut.js"></script>
   </body>
 </html>
