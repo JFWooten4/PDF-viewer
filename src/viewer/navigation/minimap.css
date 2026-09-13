@@ -58,19 +58,19 @@
   -webkit-mask-image: linear-gradient(
     to right,
     transparent,
-    rgb(0 0 0 / 35%) 8%,
-    #000 20%,
-    #000 80%,
-    rgb(0 0 0 / 35%) 92%,
+    rgb(0 0 0 / 35%) 4%,
+    #000 10%,
+    #000 90%,
+    rgb(0 0 0 / 35%) 96%,
     transparent
   );
   mask-image: linear-gradient(
     to right,
     transparent,
-    rgb(0 0 0 / 35%) 8%,
-    #000 20%,
-    #000 80%,
-    rgb(0 0 0 / 35%) 92%,
+    rgb(0 0 0 / 35%) 4%,
+    #000 10%,
+    #000 90%,
+    rgb(0 0 0 / 35%) 96%,
     transparent
   );
   opacity: 0.82;

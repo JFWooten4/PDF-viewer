@@ -153,5 +153,5 @@ test('thumbnail edges fade softly into the minimap background', () => {
   assert.doesNotMatch(styles, /\.minimap\s*\{[\s\S]*?border-left:/);
   assert.match(styles, /\.minimap-page\s*\{[\s\S]*?-webkit-mask-image:\s*linear-gradient\(/);
   assert.match(styles, /\.minimap-page\s*\{[\s\S]*?mask-image:\s*linear-gradient\(/);
-  assert.match(styles, /transparent[\s\S]*?#000 20%[\s\S]*?#000 80%[\s\S]*?transparent/);
+  assert.match(styles, /transparent[\s\S]*?#000 10%[\s\S]*?#000 90%[\s\S]*?transparent/);
 });
