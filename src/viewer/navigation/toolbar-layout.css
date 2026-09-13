@@ -235,6 +235,14 @@
   margin-inline: 0;
 }
 
+.search-control .search-nav-button {
+  width: 24px;
+}
+
+.search-control .search-nav-button + .search-nav-button {
+  margin-left: -2px;
+}
+
 .search-control input::-webkit-search-cancel-button {
   -webkit-appearance: none;
   width: 10px;

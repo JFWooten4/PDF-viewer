@@ -1,5 +1,6 @@
 import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptions, TextLayer, VerbosityLevel } from "../../node_modules/pdfjs-dist/build/pdf.mjs";
 import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
+import { resolvePdfSource } from "./pdf-source.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -43,8 +44,6 @@ const printButton = document.querySelector("#print-pdf");
 const downloadButton = document.querySelector("#download-pdf");
 const toast = document.querySelector("#toast");
 
-const params = new URLSearchParams(window.location.search);
-const source = params.get("url");
 const THEME_STORAGE_KEY = "pdf-viewer-theme";
 const LUNA_ICON = extensionAssetUrl("src/assets/luna-mark.png", "assets/luna-mark.png");
 const CELESTIA_ICON = extensionAssetUrl("src/assets/celestia-mark.png", "assets/celestia-mark.png");
@@ -260,42 +259,6 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add("visible");
   toastTimer = setTimeout(() => toast.classList.remove("visible"), 1800);
-}
-
-async function resolvePdfSource() {
-  if (chrome.mimeHandler?.getStreamInfo) {
-    try {
-      const streamInfo = await chrome.mimeHandler.getStreamInfo();
-      const response = await fetch(streamInfo.streamUrl);
-      if (!response.ok) {
-        throw new Error(`Could not read PDF stream (${response.status}).`);
-      }
-
-      const data = new Uint8Array(await response.arrayBuffer());
-      mimeHandlerActive = true;
-      return {
-        originalUrl: new URL(streamInfo.originalUrl),
-        data,
-      };
-    } catch (error) {
-      if (!source) {
-        throw error;
-      }
-    }
-  }
-
-  if (!source) {
-    throw new Error("No PDF URL or MIME-handler stream was provided.");
-  }
-
-  const fallbackOriginalUrl = new URL(source);
-  const requestUrl = new URL(fallbackOriginalUrl.href);
-  requestUrl.hash = "";
-
-  return {
-    originalUrl: fallbackOriginalUrl,
-    url: requestUrl.href,
-  };
 }
 
 function outlineHasDestination(items) {
@@ -667,6 +630,19 @@ function yieldToBrowser() {
   return new Promise((resolve) => requestAnimationFrame(resolve));
 }
 
+function markDocumentReady() {
+  const requiredPageCount = Math.min(2, pdfDocument.numPages);
+  if (renderedPages.size < requiredPageCount) {
+    return;
+  }
+
+  const root = document.documentElement;
+  root.classList.add("document-ready");
+  if (root.classList.contains("minimap-ready")) {
+    requestAnimationFrame(() => root.classList.toggle("minimap-preparing", false));
+  }
+}
+
 function pageIsInRenderWindow(pageNumber) {
   return Math.abs(pageNumber - currentPage) <= RENDER_WINDOW_RADIUS;
 }
@@ -789,6 +765,7 @@ async function renderPageNow(pageNumber) {
   );
   container.classList.add("rendered");
   renderedPages.add(pageNumber);
+  markDocumentReady();
   page.cleanup();
 }
 
@@ -901,7 +878,6 @@ function createPagePlaceholders(sampleViewport) {
     return element;
   });
 
-  status.remove();
   viewer.append(fragment);
 }
 
@@ -1254,6 +1230,7 @@ function bindControls() {
 async function initialize() {
   setTheme(localStorage.getItem(THEME_STORAGE_KEY) || "dark");
   const resolvedSource = await resolvePdfSource();
+  mimeHandlerActive = resolvedSource.mimeHandlerActive;
   originalUrl = resolvedSource.originalUrl;
   const requestedPage = getInitialPage(window.location, originalUrl);
   requestUrl = new URL(originalUrl.href);
@@ -1309,6 +1286,7 @@ async function initialize() {
   bindControls();
   await initializeSectionNavigation();
   goToPage(currentPage, "auto");
+  keepRenderWindow(currentPage);
 }
 
 initialize().catch(async (error) => {
