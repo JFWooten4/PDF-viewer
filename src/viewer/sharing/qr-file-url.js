@@ -97,13 +97,13 @@ function createDialogActions() {
 
 const dialogActions = createDialogActions();
 
-function setDialogActions(mode) {
+function setDialogActions(mode, { canDelete = false } = {}) {
   const { actions, cancelButton, confirmButton, deleteButton } = dialogActions;
   actions.hidden = mode === "none";
   actions.style.display = mode === "none" ? "none" : "flex";
   cancelButton.textContent = mode === "temporary-link" ? "Close" : "Cancel";
   confirmButton.hidden = mode !== "confirm-upload";
-  deleteButton.hidden = mode !== "temporary-link";
+  deleteButton.hidden = mode !== "temporary-link" || !canDelete;
 }
 
 function renderQrCode(fileUrl, { temporary = false } = {}) {
@@ -116,7 +116,9 @@ function renderQrCode(fileUrl, { temporary = false } = {}) {
     ecc: "medium",
   });
   qrUrl.textContent = fileUrl;
-  setDialogActions(temporary ? "temporary-link" : "none");
+  setDialogActions(temporary ? "temporary-link" : "none", {
+    canDelete: Boolean(temporaryShare?.deleteUrl),
+  });
 
   if (!qrDialog.open) {
     qrDialog.showModal();
@@ -176,10 +178,16 @@ async function uploadTemporaryLocalFile(fileUrl) {
     throw new Error("Temporary host returned an invalid share URL.");
   }
 
-  return {
-    url: uploadedUrl.href,
-    deleteUrl: uploadResponse.headers.get("X-Url-Delete"),
-  };
+  const rawDeleteUrl = uploadResponse.headers.get("X-Url-Delete");
+  let deleteUrl = null;
+  if (rawDeleteUrl) {
+    const parsedDeleteUrl = new URL(rawDeleteUrl);
+    if (parsedDeleteUrl.protocol === "https:" && parsedDeleteUrl.origin === TEMP_UPLOAD_ORIGIN) {
+      deleteUrl = parsedDeleteUrl.href;
+    }
+  }
+
+  return { url: uploadedUrl.href, deleteUrl };
 }
 
 async function deleteTemporaryShare() {
