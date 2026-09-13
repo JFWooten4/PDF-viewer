@@ -26,7 +26,6 @@
   z-index: 9;
   width: 96px;
   overflow: hidden;
-  border-left: 1px solid var(--border);
   outline: 0;
   background: var(--toolbar-bg);
   cursor: pointer;
@@ -56,6 +55,24 @@
   min-height: 0;
   overflow: hidden;
   background: var(--page-bg);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 35%) 4%,
+    #000 10%,
+    #000 90%,
+    rgb(0 0 0 / 35%) 96%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 35%) 4%,
+    #000 10%,
+    #000 90%,
+    rgb(0 0 0 / 35%) 96%,
+    transparent
+  );
   opacity: 0.82;
 }
 
