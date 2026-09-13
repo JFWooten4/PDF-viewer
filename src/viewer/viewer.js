@@ -20,6 +20,7 @@ const pageNumberInput = document.querySelector("#page-number");
 const pageCount = document.querySelector("#page-count");
 const searchInput = document.querySelector("#search-input");
 const searchCount = document.querySelector("#search-count");
+const searchFirstButton = document.querySelector("#search-first");
 const searchPreviousButton = document.querySelector("#search-previous");
 const searchNextButton = document.querySelector("#search-next");
 const shareButton = document.querySelector("#share-page");
@@ -29,6 +30,8 @@ const sectionToggle = document.querySelector("#section-toggle");
 const sectionPopover = document.querySelector("#section-popover");
 const sectionDocumentTitle = document.querySelector("#section-document-title");
 const sectionList = document.querySelector("#section-list");
+const sectionMetadata = document.querySelector("#section-metadata");
+const sectionMetadataList = document.querySelector("#section-metadata-list");
 const themeButton = document.querySelector("#theme-toggle");
 const themeIcon = document.querySelector("#theme-icon");
 const tools = document.querySelector("#tools");
@@ -55,6 +58,15 @@ const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
 );
 const SCANNED_PAGE_IMAGE_AREA_THRESHOLD = 0.8;
 const RENDER_WINDOW_RADIUS = 3;
+const PDF_METADATA_FIELDS = [
+  ["Author", "Author", "dc:creator"],
+  ["Subject", "Subject", "dc:description"],
+  ["Keywords", "Keywords", "pdf:keywords"],
+  ["Creator", "Creator", "xmp:creatortool"],
+  ["Producer", "Producer", "pdf:producer"],
+  ["Created", "CreationDate", "xmp:createdate"],
+  ["Modified", "ModDate", "xmp:modifydate"],
+];
 
 let pdfDocument;
 let pdfLinkService;
@@ -75,6 +87,7 @@ let activeSearchIndex = -1;
 let sectionEntries = [];
 let sectionHighlightRequestId = 0;
 let renderGeneration = 0;
+let renderingAllPages = false;
 let renderQueuePromise;
 const priorityRenderQueue = new Set();
 const backgroundRenderQueue = new Set();
@@ -491,19 +504,57 @@ function createOutlineList(items, parentReference = "") {
   return list;
 }
 
-async function getPdfMetadataTitle() {
+function metadataText(value) {
+  if (Array.isArray(value)) {
+    return value.map(metadataText).filter(Boolean).join(", ");
+  }
+
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return "";
+}
+
+function metadataValue(info, metadata, infoKey, xmpKey) {
+  const infoValue = metadataText(info?.[infoKey]);
+  return infoValue || metadataText(metadata?.get?.(xmpKey));
+}
+
+function renderPdfMetadata(entries) {
+  const fragment = document.createDocumentFragment();
+
+  for (const { label, value } of entries) {
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+    row.className = "section-metadata-row";
+    term.textContent = label;
+    description.textContent = value;
+    row.append(term, description);
+    fragment.append(row);
+  }
+
+  sectionMetadataList.replaceChildren(fragment);
+  sectionMetadata.hidden = entries.length === 0;
+}
+
+async function getPdfMetadataDetails() {
   try {
     const { info, metadata } = await pdfDocument.getMetadata();
-    const infoTitle = typeof info?.Title === "string" ? info.Title.trim() : "";
+    const title = metadataValue(info, metadata, "Title", "dc:title");
+    const entries = PDF_METADATA_FIELDS.map(([label, infoKey, xmpKey]) => ({
+      label,
+      value: metadataValue(info, metadata, infoKey, xmpKey),
+    })).filter(({ value }) => Boolean(value));
 
-    if (infoTitle) {
-      return infoTitle;
-    }
-
-    const xmpTitle = metadata?.get?.("dc:title");
-    return typeof xmpTitle === "string" ? xmpTitle.trim() : "";
+    return { title, entries };
   } catch {
-    return "";
+    return { title: "", entries: [] };
   }
 }
 
@@ -526,11 +577,12 @@ async function initializeSectionNavigation() {
     return;
   }
 
-  const metadataTitle = await getPdfMetadataTitle();
+  const { title: metadataTitle, entries: metadataEntries } = await getPdfMetadataDetails();
   if (metadataTitle) {
     sectionDocumentTitle.textContent = metadataTitle;
     sectionDocumentTitle.hidden = false;
   }
+  renderPdfMetadata(metadataEntries);
 
   sectionList.replaceChildren(outlineList);
   sectionNav.hidden = false;
@@ -609,6 +661,10 @@ function yieldToBrowser() {
   return new Promise((resolve) => requestAnimationFrame(resolve));
 }
 
+function pageIsInRenderWindow(pageNumber) {
+  return Math.abs(pageNumber - currentPage) <= RENDER_WINDOW_RADIUS;
+}
+
 function takeNextQueuedPage() {
   const queue = priorityRenderQueue.size > 0 ? priorityRenderQueue : backgroundRenderQueue;
   if (queue.size === 0) {
@@ -678,7 +734,7 @@ async function renderPageNow(pageNumber) {
     textLayerTask.render(),
   ]);
 
-  if (generation !== renderGeneration) {
+  if (generation !== renderGeneration || (!renderingAllPages && !pageIsInRenderWindow(pageNumber))) {
     page.cleanup();
     return;
   }
@@ -706,7 +762,7 @@ async function renderPageNow(pageNumber) {
     });
   }
 
-  if (generation !== renderGeneration) {
+  if (generation !== renderGeneration || (!renderingAllPages && !pageIsInRenderWindow(pageNumber))) {
     page.cleanup();
     return;
   }
@@ -871,13 +927,14 @@ function resetSearchResults() {
   activeSearchIndex = -1;
   completedSearchQuery = "";
   searchCount.textContent = "";
+  searchFirstButton.disabled = true;
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;
   clearSearchPageMarker();
   refreshSearchHighlights("");
 }
 
-function showSearchMatch(index, behavior = "smooth") {
+function showSearchMatch(index, behavior = "auto") {
   if (!searchMatches.length) {
     return;
   }
@@ -886,6 +943,7 @@ function showSearchMatch(index, behavior = "smooth") {
   const match = searchMatches[activeSearchIndex];
 
   searchCount.textContent = `${activeSearchIndex + 1} / ${searchMatches.length}`;
+  searchFirstButton.disabled = activeSearchIndex === 0;
   searchPreviousButton.disabled = false;
   searchNextButton.disabled = false;
 
@@ -903,6 +961,7 @@ function showSearchMatch(index, behavior = "smooth") {
 async function runSearch(rawQuery) {
   const query = normalizeSearchText(rawQuery);
   const requestId = ++searchRequestId;
+  const searchStartPage = currentPage;
 
   clearTimeout(searchTimer);
 
@@ -912,6 +971,7 @@ async function runSearch(rawQuery) {
   }
 
   searchCount.textContent = "…";
+  searchFirstButton.disabled = true;
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;
   clearSearchPageMarker();
@@ -949,12 +1009,14 @@ async function runSearch(rawQuery) {
   if (!matches.length) {
     activeSearchIndex = -1;
     searchCount.textContent = "0 / 0";
+    searchFirstButton.disabled = true;
     searchPreviousButton.disabled = true;
     searchNextButton.disabled = true;
     return;
   }
 
-  showSearchMatch(0, "auto");
+  const nearbyMatchIndex = matches.findIndex((match) => match.pageNumber >= searchStartPage);
+  showSearchMatch(nearbyMatchIndex === -1 ? 0 : nearbyMatchIndex, "auto");
 }
 
 function scheduleSearch() {
@@ -968,6 +1030,7 @@ function scheduleSearch() {
   }
 
   searchCount.textContent = "…";
+  searchFirstButton.disabled = true;
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;
   clearSearchPageMarker();
@@ -1035,7 +1098,12 @@ async function printPdf() {
 
   setToolsMenuOpen(false);
   showToast("Preparing pages for print…");
-  await queueAllPages();
+  renderingAllPages = true;
+  try {
+    await queueAllPages();
+  } finally {
+    renderingAllPages = false;
+  }
 
   const overlays = [...document.querySelectorAll(".page-image-overlay")];
   for (const overlay of overlays) {
@@ -1089,7 +1157,7 @@ function bindControls() {
   downloadButton.addEventListener("click", () => void downloadPdf());
 
   pageNumberInput.addEventListener("change", () => {
-    goToPage(Number.parseInt(pageNumberInput.value, 10) || currentPage);
+    goToPage(Number.parseInt(pageNumberInput.value, 10) || currentPage, "auto");
   });
 
   pageNumberInput.addEventListener("keydown", (event) => {
@@ -1099,6 +1167,7 @@ function bindControls() {
   });
 
   searchInput.addEventListener("input", scheduleSearch);
+  searchFirstButton.addEventListener("click", () => showSearchMatch(0));
   searchPreviousButton.addEventListener("click", () => stepSearch(-1));
   searchNextButton.addEventListener("click", () => stepSearch(1));
 
@@ -1255,6 +1324,7 @@ initialize().catch(async (error) => {
   toolsButton.disabled = true;
   pageNumberInput.disabled = true;
   searchInput.disabled = true;
+  searchFirstButton.disabled = true;
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;
 });

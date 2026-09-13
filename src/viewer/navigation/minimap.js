@@ -10,6 +10,7 @@ const minimapPages = document.querySelector("#minimap-pages");
 const minimapViewport = document.querySelector("#minimap-viewport");
 const rotateLeftButton = document.querySelector("#rotate-left");
 const rotateRightButton = document.querySelector("#rotate-right");
+const minimapToggle = document.querySelector("#show-minimap");
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -22,6 +23,7 @@ GlobalWorkerOptions.workerSrc = extensionAssetUrl(
   "pdf.worker.min.mjs",
 );
 
+const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const MINIMAP_THUMBNAIL_WIDTH = 80;
 const WHEEL_LINE_HEIGHT = 16;
@@ -41,8 +43,29 @@ function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
+function minimapEnabled() {
+  return !document.documentElement.classList.contains("minimap-disabled");
+}
+
+function setMinimapEnabled(enabled, persist = true) {
+  document.documentElement.classList.toggle("minimap-disabled", !enabled);
+  minimapToggle.checked = enabled;
+  minimap.setAttribute("aria-hidden", String(!enabled));
+  minimap.tabIndex = enabled ? 0 : -1;
+
+  if (persist) {
+    localStorage.setItem(MINIMAP_STORAGE_KEY, String(enabled));
+  }
+
+  if (enabled) {
+    scheduleSync();
+  }
+
+  window.dispatchEvent(new Event("resize"));
+}
+
 function scheduleSync() {
-  if (syncFrame) {
+  if (!minimapEnabled() || syncFrame) {
     return;
   }
 
@@ -382,6 +405,12 @@ minimap.addEventListener("keydown", (event) => {
 
 rotateLeftButton?.addEventListener("click", () => rerenderThumbnails(-90));
 rotateRightButton?.addEventListener("click", () => rerenderThumbnails(90));
+minimapToggle.addEventListener("change", () => {
+  setMinimapEnabled(minimapToggle.checked);
+});
+
+const storedMinimapPreference = localStorage.getItem(MINIMAP_STORAGE_KEY);
+setMinimapEnabled(storedMinimapPreference !== "false", false);
 
 const mutationObserver = new MutationObserver(scheduleSync);
 mutationObserver.observe(viewer, { childList: true, subtree: true });
