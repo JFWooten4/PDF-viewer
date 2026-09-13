@@ -990,7 +990,7 @@ async function runSearch(rawQuery) {
 
   if (!matches.length) {
     activeSearchIndex = -1;
-    searchCount.textContent = "0 / 0";
+    searchCount.textContent = "No results";
     searchFirstButton.disabled = true;
     searchPreviousButton.disabled = true;
     searchNextButton.disabled = true;
