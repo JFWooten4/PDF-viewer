@@ -188,6 +188,21 @@ function yieldToBrowser() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+function destroyThumbnailDocument(documentToDestroy) {
+  if (typeof documentToDestroy?.destroy !== "function") {
+    return;
+  }
+
+  try {
+    const destruction = documentToDestroy.destroy();
+    if (typeof destruction?.catch === "function") {
+      void destruction.catch(() => {});
+    }
+  } catch {
+    // Cleanup must not surface as an extension error during navigation.
+  }
+}
+
 function finishMinimapPreparation() {
   const root = document.documentElement;
   root.classList.add("minimap-ready");
@@ -224,7 +239,7 @@ async function loadThumbnailDocument(loadGeneration) {
 
   const loadedDocument = await getDocument(documentOptions).promise;
   if (loadGeneration !== thumbnailLoadGeneration || !minimapEnabled()) {
-    await loadedDocument.destroy();
+    destroyThumbnailDocument(loadedDocument);
     return;
   }
 
@@ -433,7 +448,7 @@ function stopThumbnailPreparation() {
   minimapPages.replaceChildren();
   const documentToDestroy = thumbnailDocument;
   thumbnailDocument = undefined;
-  void documentToDestroy?.destroy();
+  destroyThumbnailDocument(documentToDestroy);
 }
 
 function rerenderThumbnails(delta) {
@@ -576,7 +591,9 @@ window.addEventListener("resize", () => {
 window.addEventListener("pagehide", () => {
   thumbnailLoadGeneration += 1;
   thumbnailGeneration += 1;
-  void thumbnailDocument?.destroy();
+  const documentToDestroy = thumbnailDocument;
+  thumbnailDocument = undefined;
+  destroyThumbnailDocument(documentToDestroy);
 });
 
 scheduleSync();

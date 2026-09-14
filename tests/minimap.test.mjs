@@ -187,3 +187,10 @@ test('persistent thumbnails and their work follow the global minimap preference'
   assert.match(source, /startThumbnailPreparation\(\);\s*$/);
   assert.doesNotMatch(source, /void loadThumbnailDocument\(\)\.catch/);
 });
+
+test('thumbnail teardown tolerates documents without a destroy method', () => {
+  const f = fixture(1);
+  assert.doesNotThrow(() => vm.runInContext('destroyThumbnailDocument({})', f.context));
+  assert.doesNotMatch(source, /thumbnailDocument\?\.destroy\(\)/);
+  assert.match(source, /typeof documentToDestroy\?\.destroy !== "function"/);
+});
