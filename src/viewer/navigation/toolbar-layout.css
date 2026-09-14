@@ -253,7 +253,7 @@
     linear-gradient(-45deg, transparent 43%, var(--search-text) 43% 57%, transparent 57%);
   cursor: pointer;
   filter: none;
-  opacity: 0.82;
+  opacity: 1;
 }
 
 .search-control input::-webkit-search-cancel-button:hover {
