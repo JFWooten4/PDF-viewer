@@ -21,6 +21,7 @@ const nextButton = document.querySelector("#next-page");
 const pageNumberInput = document.querySelector("#page-number");
 const pageCount = document.querySelector("#page-count");
 const searchInput = document.querySelector("#search-input");
+const searchControl = document.querySelector(".search-control");
 const searchCount = document.querySelector("#search-count");
 const searchFirstButton = document.querySelector("#search-first");
 const searchPreviousButton = document.querySelector("#search-previous");
@@ -905,6 +906,10 @@ function clearSearchPageMarker() {
   document.querySelector(".page.search-match-page")?.classList.remove("search-match-page");
 }
 
+function setSearchEmptyState(empty) {
+  searchControl.classList.toggle("search-empty", empty);
+}
+
 function resetSearchResults() {
   searchMatches = [];
   activeSearchIndex = -1;
@@ -913,6 +918,7 @@ function resetSearchResults() {
   searchFirstButton.disabled = true;
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;
+  setSearchEmptyState(false);
   clearSearchPageMarker();
   refreshSearchHighlights("");
 }
@@ -926,6 +932,7 @@ function showSearchMatch(index, behavior = "auto") {
   const match = searchMatches[activeSearchIndex];
 
   searchCount.textContent = `${activeSearchIndex + 1} / ${searchMatches.length}`;
+  setSearchEmptyState(false);
   searchFirstButton.disabled = activeSearchIndex === 0;
   searchPreviousButton.disabled = false;
   searchNextButton.disabled = false;
@@ -954,6 +961,7 @@ async function runSearch(rawQuery) {
   }
 
   searchCount.textContent = "…";
+  setSearchEmptyState(false);
   searchFirstButton.disabled = true;
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;
@@ -992,6 +1000,7 @@ async function runSearch(rawQuery) {
   if (!matches.length) {
     activeSearchIndex = -1;
     searchCount.textContent = "No results";
+    setSearchEmptyState(true);
     searchFirstButton.disabled = true;
     searchPreviousButton.disabled = true;
     searchNextButton.disabled = true;
@@ -1013,6 +1022,7 @@ function scheduleSearch() {
   }
 
   searchCount.textContent = "…";
+  setSearchEmptyState(false);
   searchFirstButton.disabled = true;
   searchPreviousButton.disabled = true;
   searchNextButton.disabled = true;

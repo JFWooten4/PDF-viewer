@@ -20,6 +20,8 @@
   --search-ring: rgb(255 255 255 / 8%);
   --search-text: #ffffff;
   --search-muted: #aaaab1;
+  --search-empty: #c43f3f;
+  --search-empty-ring: rgb(196 63 63 / 16%);
   --search-clear-filter: invert(1);
   background: var(--body-bg);
   color: var(--text);
@@ -45,6 +47,8 @@
   --search-ring: rgb(0 0 0 / 8%);
   --search-text: #171719;
   --search-muted: #6d6d74;
+  --search-empty: #c43f3f;
+  --search-empty-ring: rgb(196 63 63 / 14%);
   --search-clear-filter: none;
 }
 
@@ -404,6 +408,16 @@ input {
   border-color: var(--search-focus-border);
   background: var(--search-focus-bg);
   box-shadow: 0 0 0 2px var(--search-ring);
+}
+
+.search-control.search-empty {
+  border-color: var(--search-empty);
+  box-shadow: 0 0 0 2px var(--search-empty-ring);
+}
+
+.search-control.search-empty .search-icon,
+.search-control.search-empty .search-count {
+  color: var(--search-empty);
 }
 
 .search-icon {
