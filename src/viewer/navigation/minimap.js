@@ -1,9 +1,9 @@
+import { pdfDocumentSessionReady } from "../pdf-document-session.js";
 import {
-  getDocument,
-  GlobalWorkerOptions,
-  VerbosityLevel,
-} from "../../../node_modules/pdfjs-dist/build/pdf.mjs";
-import { resolvePdfSource } from "../pdf-source.js";
+  createThumbnailCacheKey,
+  readThumbnailCache,
+  writeThumbnailCache,
+} from "./minimap-cache.js";
 
 const viewer = document.querySelector("#viewer");
 const minimap = document.querySelector("#minimap");
@@ -13,22 +13,12 @@ const rotateLeftButton = document.querySelector("#rotate-left");
 const rotateRightButton = document.querySelector("#rotate-right");
 const minimapToggle = document.querySelector("#show-minimap");
 
-const sourceMode = window.location.pathname.includes("/src/");
-
-function extensionAssetUrl(sourcePath, builtPath) {
-  return chrome.runtime.getURL(sourceMode ? sourcePath : builtPath);
-}
-
-GlobalWorkerOptions.workerSrc = extensionAssetUrl(
-  "node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
-  "pdf.worker.min.mjs",
-);
-
 const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_RENDER_CONCURRENCY = 4;
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const MINIMAP_THUMBNAIL_WIDTH = 80;
-const MINIMAP_THUMBNAIL_RENDER_WIDTH = 24;
+const MINIMAP_THUMBNAIL_RENDER_WIDTH = 40;
+const MINIMAP_STRIP_MAX_HEIGHT = 2048;
 const WHEEL_LINE_HEIGHT = 16;
 let syncFrame;
 let dragging = false;
@@ -36,8 +26,11 @@ let dragOffset = 0;
 let viewportHeight = 18;
 let mapHeight = 0;
 let thumbnailDocument;
+let thumbnailFingerprint;
 let thumbnailGeneration = 0;
+let thumbnailLoadGeneration = 0;
 let thumbnailRotation = 0;
+let thumbnailPreparationStarted = false;
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -76,8 +69,9 @@ function scheduleSync() {
 }
 
 function ensureTiles(pages) {
-  if (minimapPages.children.length === pages.length) {
-    return Array.from(minimapPages.children);
+  const existingTiles = Array.from(minimapPages.querySelectorAll(".minimap-page"));
+  if (existingTiles.length === pages.length) {
+    return existingTiles;
   }
 
   const fragment = document.createDocumentFragment();
@@ -127,6 +121,10 @@ function syncMinimap() {
   const tileHeights = pages.map((page) => page.getBoundingClientRect().height * scale);
   const contentHeight = tileHeights.reduce((total, height) => total + height, 0);
   mapHeight = Math.min(trackHeight, contentHeight);
+  const strip = minimapPages.querySelector(".minimap-strip");
+  if (strip) {
+    strip.style.height = `${mapHeight}px`;
+  }
   const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
 
   let packedTop = 0;
@@ -183,36 +181,26 @@ function finishMinimapPreparation() {
   }
 }
 
-async function loadThumbnailDocument() {
-  let resolvedSource;
-  try {
-    resolvedSource = await resolvePdfSource();
-  } catch {
+async function loadThumbnailDocument(loadGeneration) {
+  const session = await pdfDocumentSessionReady;
+  if (!session) {
     return;
   }
 
-  const documentOptions = {
-    cMapUrl: extensionAssetUrl("node_modules/pdfjs-dist/cmaps/", "cmaps/"),
-    cMapPacked: true,
-    standardFontDataUrl: extensionAssetUrl(
-      "node_modules/pdfjs-dist/standard_fonts/",
-      "standard_fonts/",
-    ),
-    verbosity: VerbosityLevel.ERRORS,
-    wasmUrl: extensionAssetUrl("node_modules/pdfjs-dist/wasm/", "wasm/"),
-  };
-
-  if (resolvedSource.data) {
-    documentOptions.data = resolvedSource.data;
-  } else {
-    documentOptions.url = resolvedSource.url;
-    documentOptions.withCredentials = true;
+  if (loadGeneration !== thumbnailLoadGeneration || !minimapEnabled()) {
+    return;
   }
 
-  thumbnailDocument = await getDocument(documentOptions).promise;
+  thumbnailDocument = session.document;
+  thumbnailFingerprint = session.fingerprint;
+  const generation = ++thumbnailGeneration;
+  const cachedStripPromise = restoreCachedThumbnailStrip(generation);
   await waitForPageElements(thumbnailDocument.numPages);
+  if (loadGeneration !== thumbnailLoadGeneration || !minimapEnabled()) {
+    return;
+  }
   scheduleSync();
-  await renderAllThumbnails();
+  await renderAllThumbnails(generation, cachedStripPromise);
 }
 
 async function renderThumbnail(pageNumber, generation) {
@@ -243,23 +231,121 @@ async function renderThumbnail(pageNumber, generation) {
   return generation === thumbnailGeneration ? canvas : null;
 }
 
-async function renderAllThumbnails() {
-  if (!thumbnailDocument) {
+function cacheKey() {
+  return thumbnailFingerprint
+    ? createThumbnailCacheKey(thumbnailFingerprint, thumbnailRotation, MINIMAP_THUMBNAIL_RENDER_WIDTH)
+    : null;
+}
+
+function canvasToBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => blob ? resolve(blob) : reject(new Error("Could not encode minimap thumbnail")),
+      "image/png",
+    );
+  });
+}
+
+async function canvasFromBlob(blob) {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { alpha: false });
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return canvas;
+}
+
+function composeThumbnailStrip(thumbnails) {
+  const sourceHeight = thumbnails.reduce((total, thumbnail) => total + thumbnail.height, 0);
+  const heightScale = Math.min(1, MINIMAP_STRIP_MAX_HEIGHT / Math.max(sourceHeight, 1));
+  const strip = document.createElement("canvas");
+  const context = strip.getContext("2d", { alpha: false });
+  strip.className = "minimap-strip";
+  strip.width = MINIMAP_THUMBNAIL_RENDER_WIDTH;
+  strip.height = Math.max(1, Math.round(sourceHeight * heightScale));
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, strip.width, strip.height);
+
+  let sourceTop = 0;
+  thumbnails.forEach((thumbnail) => {
+    const top = Math.round(sourceTop * heightScale);
+    sourceTop += thumbnail.height;
+    const bottom = Math.round(sourceTop * heightScale);
+    context.drawImage(thumbnail, 0, top, strip.width, Math.max(1, bottom - top));
+  });
+  return strip;
+}
+
+function attachThumbnailStrip(strip) {
+  minimapPages.querySelector(".minimap-strip")?.remove();
+  minimapPages.append(strip);
+  strip.style.height = `${mapHeight}px`;
+}
+
+async function restoreCachedThumbnailStrip(generation) {
+  const key = cacheKey();
+  if (!key) {
+    return null;
+  }
+
+  try {
+    const blob = await readThumbnailCache(key, thumbnailDocument.numPages);
+    if (!blob || generation !== thumbnailGeneration) {
+      return null;
+    }
+    const strip = await canvasFromBlob(blob);
+    strip.className = "minimap-strip";
+    return strip;
+  } catch {
+    return null;
+  }
+}
+
+async function cacheThumbnailStrip(strip) {
+  const key = cacheKey();
+  if (!key) {
     return;
   }
 
-  const generation = ++thumbnailGeneration;
+  try {
+    const blob = await canvasToBlob(strip);
+    await writeThumbnailCache(key, blob, thumbnailDocument.numPages);
+  } catch {
+    // Persistent caching is an optimization; rendering remains usable without it.
+  }
+}
+
+async function renderAllThumbnails(preparedGeneration, preparedCachedStrip) {
+  if (!thumbnailDocument || !minimapEnabled()) {
+    return;
+  }
+
+  const generation = preparedGeneration ?? ++thumbnailGeneration;
   const pages = Array.from(viewer.querySelectorAll(".page"));
   if (pages.length !== thumbnailDocument.numPages) {
     return;
   }
 
   const tiles = ensureTiles(pages);
+  const cachedStrip = await (
+    preparedCachedStrip ?? restoreCachedThumbnailStrip(generation)
+  );
+  if (generation !== thumbnailGeneration || !minimapEnabled()) {
+    return;
+  }
+  if (cachedStrip && generation === thumbnailGeneration) {
+    attachThumbnailStrip(cachedStrip);
+    scheduleSync();
+    return;
+  }
+
   const thumbnails = new Array(thumbnailDocument.numPages);
   let nextPageNumber = 1;
 
   // Render several thumbnails concurrently, but keep them off-DOM until the
-  // complete minimap can fade in with the document.
+  // complete minimap can appear with the document.
   async function renderNextThumbnail() {
     while (nextPageNumber <= thumbnailDocument.numPages) {
       const pageNumber = nextPageNumber;
@@ -285,8 +371,35 @@ async function renderAllThumbnails() {
     return;
   }
 
-  tiles.forEach((tile, index) => tile.replaceChildren(thumbnails[index]));
+  const strip = composeThumbnailStrip(thumbnails);
+  attachThumbnailStrip(strip);
   scheduleSync();
+  void cacheThumbnailStrip(strip);
+}
+
+function startThumbnailPreparation() {
+  if (thumbnailPreparationStarted || !minimapEnabled() || window.innerWidth <= 700) {
+    return;
+  }
+
+  thumbnailPreparationStarted = true;
+  const loadGeneration = ++thumbnailLoadGeneration;
+  void loadThumbnailDocument(loadGeneration)
+    .catch(() => {
+      if (loadGeneration === thumbnailLoadGeneration) {
+        thumbnailPreparationStarted = false;
+      }
+    })
+    .finally(finishMinimapPreparation);
+}
+
+function stopThumbnailPreparation() {
+  thumbnailLoadGeneration += 1;
+  thumbnailGeneration += 1;
+  thumbnailPreparationStarted = false;
+  minimapPages.replaceChildren();
+  thumbnailDocument = undefined;
+  thumbnailFingerprint = undefined;
 }
 
 function rerenderThumbnails(delta) {
@@ -401,6 +514,11 @@ rotateLeftButton?.addEventListener("click", () => rerenderThumbnails(-90));
 rotateRightButton?.addEventListener("click", () => rerenderThumbnails(90));
 minimapToggle.addEventListener("change", () => {
   setMinimapEnabled(minimapToggle.checked);
+  if (minimapToggle.checked) {
+    startThumbnailPreparation();
+  } else {
+    stopThumbnailPreparation();
+  }
 });
 
 const storedMinimapPreference = localStorage.getItem(MINIMAP_STORAGE_KEY);
@@ -417,11 +535,16 @@ const resizeObserver = new ResizeObserver(scheduleSync);
 resizeObserver.observe(viewer);
 
 window.addEventListener("scroll", scheduleSync, { passive: true });
-window.addEventListener("resize", scheduleSync);
+window.addEventListener("resize", () => {
+  scheduleSync();
+  startThumbnailPreparation();
+});
 window.addEventListener("pagehide", () => {
+  thumbnailLoadGeneration += 1;
   thumbnailGeneration += 1;
-  void thumbnailDocument?.destroy();
+  thumbnailDocument = undefined;
+  thumbnailFingerprint = undefined;
 });
 
 scheduleSync();
-void loadThumbnailDocument().catch(() => {}).finally(finishMinimapPreparation);
+startThumbnailPreparation();

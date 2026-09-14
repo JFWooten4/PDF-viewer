@@ -1,5 +1,6 @@
 import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptions, TextLayer, VerbosityLevel } from "../../node_modules/pdfjs-dist/build/pdf.mjs";
 import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
+import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { resolvePdfSource } from "./pdf-source.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
@@ -1265,6 +1266,7 @@ async function initialize() {
 
   const loadingTask = getDocument(documentOptions);
   pdfDocument = await loadingTask.promise;
+  publishPdfDocument(pdfDocument);
   pdfLinkService = new PDFLinkService({
     eventBus: new EventBus(),
     externalLinkTarget: 2,
@@ -1290,6 +1292,7 @@ async function initialize() {
 }
 
 initialize().catch(async (error) => {
+  abandonPdfDocumentSession();
   if (mimeHandlerActive && chrome.mimeHandler?.abortAndFallbackToNativeHandler) {
     try {
       await chrome.mimeHandler.abortAndFallbackToNativeHandler();
