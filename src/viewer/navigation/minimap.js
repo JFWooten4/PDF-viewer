@@ -1,9 +1,4 @@
-import {
-  getDocument,
-  GlobalWorkerOptions,
-  VerbosityLevel,
-} from "../../../node_modules/pdfjs-dist/build/pdf.mjs";
-import { resolvePdfSource } from "../pdf-source.js";
+import { pdfDocumentSessionReady } from "../pdf-document-session.js";
 import {
   createThumbnailCacheKey,
   readThumbnailCache,
@@ -18,17 +13,6 @@ const rotateLeftButton = document.querySelector("#rotate-left");
 const rotateRightButton = document.querySelector("#rotate-right");
 const minimapToggle = document.querySelector("#show-minimap");
 
-const sourceMode = window.location.pathname.includes("/src/");
-
-function extensionAssetUrl(sourcePath, builtPath) {
-  return chrome.runtime.getURL(sourceMode ? sourcePath : builtPath);
-}
-
-GlobalWorkerOptions.workerSrc = extensionAssetUrl(
-  "node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
-  "pdf.worker.min.mjs",
-);
-
 const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_RENDER_CONCURRENCY = 4;
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
@@ -42,6 +26,7 @@ let dragOffset = 0;
 let viewportHeight = 18;
 let mapHeight = 0;
 let thumbnailDocument;
+let thumbnailFingerprint;
 let thumbnailGeneration = 0;
 let thumbnailLoadGeneration = 0;
 let thumbnailRotation = 0;
@@ -188,21 +173,6 @@ function yieldToBrowser() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function destroyThumbnailDocument(documentToDestroy) {
-  if (typeof documentToDestroy?.destroy !== "function") {
-    return;
-  }
-
-  try {
-    const destruction = documentToDestroy.destroy();
-    if (typeof destruction?.catch === "function") {
-      void destruction.catch(() => {});
-    }
-  } catch {
-    // Cleanup must not surface as an extension error during navigation.
-  }
-}
-
 function finishMinimapPreparation() {
   const root = document.documentElement;
   root.classList.add("minimap-ready");
@@ -212,44 +182,25 @@ function finishMinimapPreparation() {
 }
 
 async function loadThumbnailDocument(loadGeneration) {
-  let resolvedSource;
-  try {
-    resolvedSource = await resolvePdfSource();
-  } catch {
+  const session = await pdfDocumentSessionReady;
+  if (!session) {
     return;
   }
 
-  const documentOptions = {
-    cMapUrl: extensionAssetUrl("node_modules/pdfjs-dist/cmaps/", "cmaps/"),
-    cMapPacked: true,
-    standardFontDataUrl: extensionAssetUrl(
-      "node_modules/pdfjs-dist/standard_fonts/",
-      "standard_fonts/",
-    ),
-    verbosity: VerbosityLevel.ERRORS,
-    wasmUrl: extensionAssetUrl("node_modules/pdfjs-dist/wasm/", "wasm/"),
-  };
-
-  if (resolvedSource.data) {
-    documentOptions.data = resolvedSource.data;
-  } else {
-    documentOptions.url = resolvedSource.url;
-    documentOptions.withCredentials = true;
-  }
-
-  const loadedDocument = await getDocument(documentOptions).promise;
   if (loadGeneration !== thumbnailLoadGeneration || !minimapEnabled()) {
-    destroyThumbnailDocument(loadedDocument);
     return;
   }
 
-  thumbnailDocument = loadedDocument;
+  thumbnailDocument = session.document;
+  thumbnailFingerprint = session.fingerprint;
+  const generation = ++thumbnailGeneration;
+  const cachedStripPromise = restoreCachedThumbnailStrip(generation);
   await waitForPageElements(thumbnailDocument.numPages);
   if (loadGeneration !== thumbnailLoadGeneration || !minimapEnabled()) {
     return;
   }
   scheduleSync();
-  await renderAllThumbnails();
+  await renderAllThumbnails(generation, cachedStripPromise);
 }
 
 async function renderThumbnail(pageNumber, generation) {
@@ -281,9 +232,8 @@ async function renderThumbnail(pageNumber, generation) {
 }
 
 function cacheKey() {
-  const fingerprint = thumbnailDocument?.fingerprints?.[0];
-  return fingerprint
-    ? createThumbnailCacheKey(fingerprint, thumbnailRotation, MINIMAP_THUMBNAIL_RENDER_WIDTH)
+  return thumbnailFingerprint
+    ? createThumbnailCacheKey(thumbnailFingerprint, thumbnailRotation, MINIMAP_THUMBNAIL_RENDER_WIDTH)
     : null;
 }
 
@@ -367,19 +317,21 @@ async function cacheThumbnailStrip(strip) {
   }
 }
 
-async function renderAllThumbnails() {
+async function renderAllThumbnails(preparedGeneration, preparedCachedStrip) {
   if (!thumbnailDocument || !minimapEnabled()) {
     return;
   }
 
-  const generation = ++thumbnailGeneration;
+  const generation = preparedGeneration ?? ++thumbnailGeneration;
   const pages = Array.from(viewer.querySelectorAll(".page"));
   if (pages.length !== thumbnailDocument.numPages) {
     return;
   }
 
   const tiles = ensureTiles(pages);
-  const cachedStrip = await restoreCachedThumbnailStrip(generation);
+  const cachedStrip = await (
+    preparedCachedStrip ?? restoreCachedThumbnailStrip(generation)
+  );
   if (generation !== thumbnailGeneration || !minimapEnabled()) {
     return;
   }
@@ -446,9 +398,8 @@ function stopThumbnailPreparation() {
   thumbnailGeneration += 1;
   thumbnailPreparationStarted = false;
   minimapPages.replaceChildren();
-  const documentToDestroy = thumbnailDocument;
   thumbnailDocument = undefined;
-  destroyThumbnailDocument(documentToDestroy);
+  thumbnailFingerprint = undefined;
 }
 
 function rerenderThumbnails(delta) {
@@ -591,9 +542,8 @@ window.addEventListener("resize", () => {
 window.addEventListener("pagehide", () => {
   thumbnailLoadGeneration += 1;
   thumbnailGeneration += 1;
-  const documentToDestroy = thumbnailDocument;
   thumbnailDocument = undefined;
-  destroyThumbnailDocument(documentToDestroy);
+  thumbnailFingerprint = undefined;
 });
 
 scheduleSync();

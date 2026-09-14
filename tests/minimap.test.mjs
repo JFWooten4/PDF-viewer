@@ -4,8 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../src/viewer/navigation/minimap.js', import.meta.url), 'utf8')
-  .replace(/^import \{[\s\S]*?\} from "\.\.\/\.\.\/\.\.\/node_modules\/pdfjs-dist\/build\/pdf\.mjs";\n/, '')
-  .replace(/^import \{ resolvePdfSource \} from "\.\.\/pdf-source\.js";\n/, '')
+  .replace(/^import \{ pdfDocumentSessionReady \} from "\.\.\/pdf-document-session\.js";\n/, '')
   .replace(/^import \{[\s\S]*?\} from "\.\/minimap-cache\.js";\n/, '');
 const styles = readFileSync(new URL('../src/viewer/navigation/minimap.css', import.meta.url), 'utf8');
 const viewerStyles = readFileSync(new URL('../src/viewer/viewer.css', import.meta.url), 'utf8');
@@ -47,7 +46,7 @@ function fixture(count, height = 900) {
   const observer = class { observe() {} };
   const chrome = { runtime: { getURL: value => value } };
   const context = vm.createContext({ document, window, localStorage, chrome,
-    resolvePdfSource: async () => { throw new Error('No PDF source in geometry fixture'); },
+    pdfDocumentSessionReady: new Promise(() => {}),
     GlobalWorkerOptions: {}, VerbosityLevel: { ERRORS: 0 }, URLSearchParams, Event, MutationObserver: observer,
     ResizeObserver: observer, WheelEvent: { DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2 }, requestAnimationFrame() { return 1; } });
   vm.runInContext(source, context);
@@ -189,8 +188,17 @@ test('persistent thumbnails and their work follow the global minimap preference'
 });
 
 test('thumbnail teardown tolerates documents without a destroy method', () => {
-  const f = fixture(1);
-  assert.doesNotThrow(() => vm.runInContext('destroyThumbnailDocument({})', f.context));
+  fixture(1);
   assert.doesNotMatch(source, /thumbnailDocument\?\.destroy\(\)/);
-  assert.match(source, /typeof documentToDestroy\?\.destroy !== "function"/);
+  assert.doesNotMatch(source, /documentToDestroy\.destroy\(\)/);
+});
+
+test('minimap shares the viewer document and its cached fingerprint', () => {
+  assert.match(source, /const session = await pdfDocumentSessionReady/);
+  assert.match(source, /thumbnailDocument = session\.document/);
+  assert.match(source, /thumbnailFingerprint = session\.fingerprint/);
+  assert.match(source, /cachedStripPromise = restoreCachedThumbnailStrip\(generation\);[\s\S]*?await waitForPageElements/);
+  assert.doesNotMatch(source, /getDocument\(/);
+  assert.doesNotMatch(source, /resolvePdfSource\(/);
+  assert.match(viewerSource, /publishPdfDocument\(pdfDocument\)/);
 });
