@@ -4,6 +4,11 @@ import {
   VerbosityLevel,
 } from "../../../node_modules/pdfjs-dist/build/pdf.mjs";
 import { resolvePdfSource } from "../pdf-source.js";
+import {
+  createThumbnailCacheKey,
+  readThumbnailCache,
+  writeThumbnailCache,
+} from "./minimap-cache.js";
 
 const viewer = document.querySelector("#viewer");
 const minimap = document.querySelector("#minimap");
@@ -28,7 +33,7 @@ const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_RENDER_CONCURRENCY = 4;
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const MINIMAP_THUMBNAIL_WIDTH = 80;
-const MINIMAP_THUMBNAIL_RENDER_WIDTH = 24;
+const MINIMAP_THUMBNAIL_RENDER_WIDTH = 40;
 const WHEEL_LINE_HEIGHT = 16;
 let syncFrame;
 let dragging = false;
@@ -37,7 +42,9 @@ let viewportHeight = 18;
 let mapHeight = 0;
 let thumbnailDocument;
 let thumbnailGeneration = 0;
+let thumbnailLoadGeneration = 0;
 let thumbnailRotation = 0;
+let thumbnailPreparationStarted = false;
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -183,7 +190,7 @@ function finishMinimapPreparation() {
   }
 }
 
-async function loadThumbnailDocument() {
+async function loadThumbnailDocument(loadGeneration) {
   let resolvedSource;
   try {
     resolvedSource = await resolvePdfSource();
@@ -209,8 +216,17 @@ async function loadThumbnailDocument() {
     documentOptions.withCredentials = true;
   }
 
-  thumbnailDocument = await getDocument(documentOptions).promise;
+  const loadedDocument = await getDocument(documentOptions).promise;
+  if (loadGeneration !== thumbnailLoadGeneration || !minimapEnabled()) {
+    await loadedDocument.destroy();
+    return;
+  }
+
+  thumbnailDocument = loadedDocument;
   await waitForPageElements(thumbnailDocument.numPages);
+  if (loadGeneration !== thumbnailLoadGeneration || !minimapEnabled()) {
+    return;
+  }
   scheduleSync();
   await renderAllThumbnails();
 }
@@ -243,8 +259,67 @@ async function renderThumbnail(pageNumber, generation) {
   return generation === thumbnailGeneration ? canvas : null;
 }
 
+function cacheKey() {
+  const fingerprint = thumbnailDocument?.fingerprints?.[0];
+  return fingerprint
+    ? createThumbnailCacheKey(fingerprint, thumbnailRotation, MINIMAP_THUMBNAIL_RENDER_WIDTH)
+    : null;
+}
+
+function canvasToBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => blob ? resolve(blob) : reject(new Error("Could not encode minimap thumbnail")),
+      "image/webp",
+      0.6,
+    );
+  });
+}
+
+async function canvasFromBlob(blob) {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { alpha: false });
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return canvas;
+}
+
+async function restoreCachedThumbnails(generation) {
+  const key = cacheKey();
+  if (!key) {
+    return null;
+  }
+
+  try {
+    const blobs = await readThumbnailCache(key, thumbnailDocument.numPages);
+    if (!blobs || generation !== thumbnailGeneration) {
+      return null;
+    }
+    return await Promise.all(blobs.map(canvasFromBlob));
+  } catch {
+    return null;
+  }
+}
+
+async function cacheThumbnails(thumbnails) {
+  const key = cacheKey();
+  if (!key) {
+    return;
+  }
+
+  try {
+    const blobs = await Promise.all(thumbnails.map(canvasToBlob));
+    await writeThumbnailCache(key, blobs);
+  } catch {
+    // Persistent caching is an optimization; rendering remains usable without it.
+  }
+}
+
 async function renderAllThumbnails() {
-  if (!thumbnailDocument) {
+  if (!thumbnailDocument || !minimapEnabled()) {
     return;
   }
 
@@ -255,11 +330,21 @@ async function renderAllThumbnails() {
   }
 
   const tiles = ensureTiles(pages);
+  const cachedThumbnails = await restoreCachedThumbnails(generation);
+  if (generation !== thumbnailGeneration || !minimapEnabled()) {
+    return;
+  }
+  if (cachedThumbnails && generation === thumbnailGeneration) {
+    tiles.forEach((tile, index) => tile.replaceChildren(cachedThumbnails[index]));
+    scheduleSync();
+    return;
+  }
+
   const thumbnails = new Array(thumbnailDocument.numPages);
   let nextPageNumber = 1;
 
   // Render several thumbnails concurrently, but keep them off-DOM until the
-  // complete minimap can fade in with the document.
+  // complete minimap can appear with the document.
   async function renderNextThumbnail() {
     while (nextPageNumber <= thumbnailDocument.numPages) {
       const pageNumber = nextPageNumber;
@@ -287,6 +372,33 @@ async function renderAllThumbnails() {
 
   tiles.forEach((tile, index) => tile.replaceChildren(thumbnails[index]));
   scheduleSync();
+  void cacheThumbnails(thumbnails);
+}
+
+function startThumbnailPreparation() {
+  if (thumbnailPreparationStarted || !minimapEnabled() || window.innerWidth <= 700) {
+    return;
+  }
+
+  thumbnailPreparationStarted = true;
+  const loadGeneration = ++thumbnailLoadGeneration;
+  void loadThumbnailDocument(loadGeneration)
+    .catch(() => {
+      if (loadGeneration === thumbnailLoadGeneration) {
+        thumbnailPreparationStarted = false;
+      }
+    })
+    .finally(finishMinimapPreparation);
+}
+
+function stopThumbnailPreparation() {
+  thumbnailLoadGeneration += 1;
+  thumbnailGeneration += 1;
+  thumbnailPreparationStarted = false;
+  minimapPages.replaceChildren();
+  const documentToDestroy = thumbnailDocument;
+  thumbnailDocument = undefined;
+  void documentToDestroy?.destroy();
 }
 
 function rerenderThumbnails(delta) {
@@ -401,6 +513,11 @@ rotateLeftButton?.addEventListener("click", () => rerenderThumbnails(-90));
 rotateRightButton?.addEventListener("click", () => rerenderThumbnails(90));
 minimapToggle.addEventListener("change", () => {
   setMinimapEnabled(minimapToggle.checked);
+  if (minimapToggle.checked) {
+    startThumbnailPreparation();
+  } else {
+    stopThumbnailPreparation();
+  }
 });
 
 const storedMinimapPreference = localStorage.getItem(MINIMAP_STORAGE_KEY);
@@ -417,11 +534,15 @@ const resizeObserver = new ResizeObserver(scheduleSync);
 resizeObserver.observe(viewer);
 
 window.addEventListener("scroll", scheduleSync, { passive: true });
-window.addEventListener("resize", scheduleSync);
+window.addEventListener("resize", () => {
+  scheduleSync();
+  startThumbnailPreparation();
+});
 window.addEventListener("pagehide", () => {
+  thumbnailLoadGeneration += 1;
   thumbnailGeneration += 1;
   void thumbnailDocument?.destroy();
 });
 
 scheduleSync();
-void loadThumbnailDocument().catch(() => {}).finally(finishMinimapPreparation);
+startThumbnailPreparation();

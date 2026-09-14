@@ -29,11 +29,12 @@
   top: 50%;
   left: 50%;
   width: clamp(210px, 42vw, 320px);
-  aspect-ratio: 2 / 1;
+  aspect-ratio: 160 / 84;
   background: url("../assets/rainbow-dash-wonderbolt-loader.svg") center / contain no-repeat;
-  filter: drop-shadow(0 8px 8px rgb(0 0 0 / 24%));
+  image-rendering: pixelated;
+  filter: drop-shadow(10px 8px 0 rgb(0 0 0 / 16%));
   transform-origin: 50% 50%;
-  animation: rainbow-dash-race 880ms ease-in-out infinite;
+  animation: rainbow-dash-race 880ms steps(6, end) infinite;
 }
 
 @keyframes loading-race-lines {

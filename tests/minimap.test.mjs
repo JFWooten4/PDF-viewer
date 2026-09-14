@@ -5,10 +5,13 @@ import vm from 'node:vm';
 
 const source = readFileSync(new URL('../src/viewer/navigation/minimap.js', import.meta.url), 'utf8')
   .replace(/^import \{[\s\S]*?\} from "\.\.\/\.\.\/\.\.\/node_modules\/pdfjs-dist\/build\/pdf\.mjs";\n/, '')
-  .replace(/^import \{ resolvePdfSource \} from "\.\.\/pdf-source\.js";\n/, '');
+  .replace(/^import \{ resolvePdfSource \} from "\.\.\/pdf-source\.js";\n/, '')
+  .replace(/^import \{[\s\S]*?\} from "\.\/minimap-cache\.js";\n/, '');
 const styles = readFileSync(new URL('../src/viewer/navigation/minimap.css', import.meta.url), 'utf8');
 const viewerStyles = readFileSync(new URL('../src/viewer/viewer.css', import.meta.url), 'utf8');
 const viewerSource = readFileSync(new URL('../src/viewer/viewer.js', import.meta.url), 'utf8');
+const viewerMarkup = readFileSync(new URL('../src/viewer.html', import.meta.url), 'utf8');
+const toggleStyles = readFileSync(new URL('../src/viewer/theme/image-color-toggle.css', import.meta.url), 'utf8');
 function fixture(count, height = 900) {
   const windowEvents = [];
   const window = { innerHeight: height, scrollY: 0, location: { pathname: '/src/viewer.html', search: '' }, addEventListener() {},
@@ -21,8 +24,12 @@ function fixture(count, height = 900) {
   const track = { clientHeight: height - 52, addEventListener(type, callback) { listeners[type] = callback; }, setAttribute() {} };
   const viewport = { style: {} };
   const toggle = { checked: true, addEventListener(type, callback) { listeners[`toggle-${type}`] = callback; } };
+  const minimapPageContainer = {
+    children: tiles,
+    replaceChildren(...children) { this.children = children; },
+  };
   const elements = { '#viewer': { querySelectorAll: () => pages }, '#minimap': track,
-    '#minimap-pages': { children: tiles }, '#minimap-viewport': viewport, '#show-minimap': toggle };
+    '#minimap-pages': minimapPageContainer, '#minimap-viewport': viewport, '#show-minimap': toggle };
   const classes = new Set();
   const document = { querySelector: selector => elements[selector],
     documentElement: { scrollHeight: count * 1420, classList: {
@@ -134,12 +141,15 @@ test('minimap toggle persists visibility and updates accessibility state', () =>
   assert.equal(f.track.tabIndex, 0);
   assert.equal(f.storedValues.get('pdf-viewer-show-minimap'), 'true');
   assert.deepEqual(f.windowEvents, ['resize', 'resize', 'resize']);
+  assert.match(viewerMarkup, /id="show-minimap" class="checkbox-input" type="checkbox"/);
+  assert.doesNotMatch(viewerMarkup, /id="show-minimap"[\s\S]{0,120}toggle-switch/);
+  assert.match(toggleStyles, /\.checkbox-input:checked\s*\{/);
 });
 
 test('the loading screen remains until concurrent thumbnails and the first two pages are ready', () => {
   assert.match(source, /MINIMAP_RENDER_CONCURRENCY\s*=\s*4/);
   assert.match(source, /await Promise\.all\(/);
-  assert.match(source, /loadThumbnailDocument\(\)\.catch\(\(\) => \{\}\)\.finally\(finishMinimapPreparation\)/);
+  assert.match(source, /void loadThumbnailDocument\(loadGeneration\)[\s\S]*?\.finally\(finishMinimapPreparation\)/);
   assert.match(source, /classList\.add\("minimap-ready"\)/);
   assert.match(viewerSource, /requiredPageCount\s*=\s*Math\.min\(2, pdfDocument\.numPages\)/);
   assert.match(viewerSource, /classList\.add\("document-ready"\)/);
@@ -159,6 +169,16 @@ test('thumbnail edges fade softly into the minimap background', () => {
 
 test('thumbnail canvases render below their displayed width', () => {
   assert.match(source, /MINIMAP_THUMBNAIL_WIDTH\s*=\s*80/);
-  assert.match(source, /MINIMAP_THUMBNAIL_RENDER_WIDTH\s*=\s*24/);
+  assert.match(source, /MINIMAP_THUMBNAIL_RENDER_WIDTH\s*=\s*40/);
   assert.match(source, /scale:\s*MINIMAP_THUMBNAIL_RENDER_WIDTH\s*\/\s*Math\.max\(baseViewport\.width, 1\)/);
+});
+
+test('persistent thumbnails and their work follow the global minimap preference', () => {
+  assert.match(source, /restoreCachedThumbnails\(generation\)/);
+  assert.match(source, /void cacheThumbnails\(thumbnails\)/);
+  assert.match(source, /if \(thumbnailPreparationStarted \|\| !minimapEnabled\(\) \|\| window\.innerWidth <= 700\)/);
+  assert.match(source, /else \{\s*stopThumbnailPreparation\(\);/);
+  assert.match(source, /thumbnailLoadGeneration \+= 1;[\s\S]*?thumbnailDocument = undefined/);
+  assert.match(source, /startThumbnailPreparation\(\);\s*$/);
+  assert.doesNotMatch(source, /void loadThumbnailDocument\(\)\.catch/);
 });
