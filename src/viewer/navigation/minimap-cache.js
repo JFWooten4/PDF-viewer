@@ -39,7 +39,7 @@ function openDatabase() {
 }
 
 export function createThumbnailCacheKey(fingerprint, rotation, renderWidth) {
-  return `${fingerprint}:${rotation}:${renderWidth}`;
+  return `${fingerprint}:${rotation}:${renderWidth}:strip-v1`;
 }
 
 export async function readThumbnailCache(key, expectedPageCount) {
@@ -48,23 +48,23 @@ export async function readThumbnailCache(key, expectedPageCount) {
   const record = await requestResult(transaction.objectStore(STORE_NAME).get(key));
   await transactionFinished(transaction);
 
-  if (!record || record.pageCount !== expectedPageCount || record.blobs.length !== expectedPageCount) {
+  if (!record || record.pageCount !== expectedPageCount || !record.blob) {
     return null;
   }
 
   const touchTransaction = database.transaction(STORE_NAME, "readwrite");
   touchTransaction.objectStore(STORE_NAME).put({ ...record, accessedAt: Date.now() });
   void transactionFinished(touchTransaction).catch(() => {});
-  return record.blobs;
+  return record.blob;
 }
 
-export async function writeThumbnailCache(key, blobs) {
+export async function writeThumbnailCache(key, blob, pageCount) {
   const database = await openDatabase();
   const writeTransaction = database.transaction(STORE_NAME, "readwrite");
   writeTransaction.objectStore(STORE_NAME).put({
     key,
-    pageCount: blobs.length,
-    blobs,
+    pageCount,
+    blob,
     accessedAt: Date.now(),
   });
   await transactionFinished(writeTransaction);

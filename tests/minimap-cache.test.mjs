@@ -9,7 +9,7 @@ const source = readFileSync(
 );
 
 test("thumbnail cache keys isolate documents, rotations, and resolutions", () => {
-  assert.equal(createThumbnailCacheKey("fingerprint", 90, 40), "fingerprint:90:40");
+  assert.equal(createThumbnailCacheKey("fingerprint", 90, 40), "fingerprint:90:40:strip-v1");
   assert.notEqual(
     createThumbnailCacheKey("first-document", 0, 40),
     createThumbnailCacheKey("second-document", 0, 40),
@@ -21,4 +21,6 @@ test("thumbnail cache is persistent and bounded", () => {
   assert.match(source, /MAX_CACHE_ENTRIES\s*=\s*16/);
   assert.match(source, /openKeyCursor\(\)/);
   assert.doesNotMatch(source, /\.getAll\(\)/);
+  assert.match(source, /pageCount,[\s\S]*?blob,/);
+  assert.doesNotMatch(source, /blobs/);
 });

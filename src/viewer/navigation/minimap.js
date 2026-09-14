@@ -34,6 +34,7 @@ const MINIMAP_RENDER_CONCURRENCY = 4;
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const MINIMAP_THUMBNAIL_WIDTH = 80;
 const MINIMAP_THUMBNAIL_RENDER_WIDTH = 40;
+const MINIMAP_STRIP_MAX_HEIGHT = 2048;
 const WHEEL_LINE_HEIGHT = 16;
 let syncFrame;
 let dragging = false;
@@ -83,8 +84,9 @@ function scheduleSync() {
 }
 
 function ensureTiles(pages) {
-  if (minimapPages.children.length === pages.length) {
-    return Array.from(minimapPages.children);
+  const existingTiles = Array.from(minimapPages.querySelectorAll(".minimap-page"));
+  if (existingTiles.length === pages.length) {
+    return existingTiles;
   }
 
   const fragment = document.createDocumentFragment();
@@ -134,6 +136,10 @@ function syncMinimap() {
   const tileHeights = pages.map((page) => page.getBoundingClientRect().height * scale);
   const contentHeight = tileHeights.reduce((total, height) => total + height, 0);
   mapHeight = Math.min(trackHeight, contentHeight);
+  const strip = minimapPages.querySelector(".minimap-strip");
+  if (strip) {
+    strip.style.height = `${mapHeight}px`;
+  }
   const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
 
   let packedTop = 0;
@@ -270,8 +276,7 @@ function canvasToBlob(canvas) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => blob ? resolve(blob) : reject(new Error("Could not encode minimap thumbnail")),
-      "image/webp",
-      0.6,
+      "image/png",
     );
   });
 }
@@ -287,32 +292,61 @@ async function canvasFromBlob(blob) {
   return canvas;
 }
 
-async function restoreCachedThumbnails(generation) {
+function composeThumbnailStrip(thumbnails) {
+  const sourceHeight = thumbnails.reduce((total, thumbnail) => total + thumbnail.height, 0);
+  const heightScale = Math.min(1, MINIMAP_STRIP_MAX_HEIGHT / Math.max(sourceHeight, 1));
+  const strip = document.createElement("canvas");
+  const context = strip.getContext("2d", { alpha: false });
+  strip.className = "minimap-strip";
+  strip.width = MINIMAP_THUMBNAIL_RENDER_WIDTH;
+  strip.height = Math.max(1, Math.round(sourceHeight * heightScale));
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, strip.width, strip.height);
+
+  let sourceTop = 0;
+  thumbnails.forEach((thumbnail) => {
+    const top = Math.round(sourceTop * heightScale);
+    sourceTop += thumbnail.height;
+    const bottom = Math.round(sourceTop * heightScale);
+    context.drawImage(thumbnail, 0, top, strip.width, Math.max(1, bottom - top));
+  });
+  return strip;
+}
+
+function attachThumbnailStrip(strip) {
+  minimapPages.querySelector(".minimap-strip")?.remove();
+  minimapPages.append(strip);
+  strip.style.height = `${mapHeight}px`;
+}
+
+async function restoreCachedThumbnailStrip(generation) {
   const key = cacheKey();
   if (!key) {
     return null;
   }
 
   try {
-    const blobs = await readThumbnailCache(key, thumbnailDocument.numPages);
-    if (!blobs || generation !== thumbnailGeneration) {
+    const blob = await readThumbnailCache(key, thumbnailDocument.numPages);
+    if (!blob || generation !== thumbnailGeneration) {
       return null;
     }
-    return await Promise.all(blobs.map(canvasFromBlob));
+    const strip = await canvasFromBlob(blob);
+    strip.className = "minimap-strip";
+    return strip;
   } catch {
     return null;
   }
 }
 
-async function cacheThumbnails(thumbnails) {
+async function cacheThumbnailStrip(strip) {
   const key = cacheKey();
   if (!key) {
     return;
   }
 
   try {
-    const blobs = await Promise.all(thumbnails.map(canvasToBlob));
-    await writeThumbnailCache(key, blobs);
+    const blob = await canvasToBlob(strip);
+    await writeThumbnailCache(key, blob, thumbnailDocument.numPages);
   } catch {
     // Persistent caching is an optimization; rendering remains usable without it.
   }
@@ -330,12 +364,12 @@ async function renderAllThumbnails() {
   }
 
   const tiles = ensureTiles(pages);
-  const cachedThumbnails = await restoreCachedThumbnails(generation);
+  const cachedStrip = await restoreCachedThumbnailStrip(generation);
   if (generation !== thumbnailGeneration || !minimapEnabled()) {
     return;
   }
-  if (cachedThumbnails && generation === thumbnailGeneration) {
-    tiles.forEach((tile, index) => tile.replaceChildren(cachedThumbnails[index]));
+  if (cachedStrip && generation === thumbnailGeneration) {
+    attachThumbnailStrip(cachedStrip);
     scheduleSync();
     return;
   }
@@ -370,9 +404,10 @@ async function renderAllThumbnails() {
     return;
   }
 
-  tiles.forEach((tile, index) => tile.replaceChildren(thumbnails[index]));
+  const strip = composeThumbnailStrip(thumbnails);
+  attachThumbnailStrip(strip);
   scheduleSync();
-  void cacheThumbnails(thumbnails);
+  void cacheThumbnailStrip(strip);
 }
 
 function startThumbnailPreparation() {

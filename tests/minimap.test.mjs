@@ -26,6 +26,8 @@ function fixture(count, height = 900) {
   const toggle = { checked: true, addEventListener(type, callback) { listeners[`toggle-${type}`] = callback; } };
   const minimapPageContainer = {
     children: tiles,
+    querySelectorAll: selector => selector === '.minimap-page' ? tiles : [],
+    querySelector: () => null,
     replaceChildren(...children) { this.children = children; },
   };
   const elements = { '#viewer': { querySelectorAll: () => pages }, '#minimap': track,
@@ -162,8 +164,8 @@ test('the loading screen remains until concurrent thumbnails and the first two p
 
 test('thumbnail edges fade softly into the minimap background', () => {
   assert.doesNotMatch(styles, /\.minimap\s*\{[\s\S]*?border-left:/);
-  assert.match(styles, /\.minimap-page\s*\{[\s\S]*?-webkit-mask-image:\s*linear-gradient\(/);
-  assert.match(styles, /\.minimap-page\s*\{[\s\S]*?mask-image:\s*linear-gradient\(/);
+  assert.match(styles, /\.minimap-strip\s*\{[\s\S]*?-webkit-mask-image:\s*linear-gradient\(/);
+  assert.match(styles, /\.minimap-strip\s*\{[\s\S]*?mask-image:\s*linear-gradient\(/);
   assert.match(styles, /transparent[\s\S]*?#000 10%[\s\S]*?#000 90%[\s\S]*?transparent/);
 });
 
@@ -174,8 +176,11 @@ test('thumbnail canvases render below their displayed width', () => {
 });
 
 test('persistent thumbnails and their work follow the global minimap preference', () => {
-  assert.match(source, /restoreCachedThumbnails\(generation\)/);
-  assert.match(source, /void cacheThumbnails\(thumbnails\)/);
+  assert.match(source, /restoreCachedThumbnailStrip\(generation\)/);
+  assert.match(source, /void cacheThumbnailStrip\(strip\)/);
+  assert.match(source, /composeThumbnailStrip\(thumbnails\)/);
+  assert.match(source, /minimapPages\.append\(strip\)/);
+  assert.match(source, /"image\/png"/);
   assert.match(source, /if \(thumbnailPreparationStarted \|\| !minimapEnabled\(\) \|\| window\.innerWidth <= 700\)/);
   assert.match(source, /else \{\s*stopThumbnailPreparation\(\);/);
   assert.match(source, /thumbnailLoadGeneration \+= 1;[\s\S]*?thumbnailDocument = undefined/);
